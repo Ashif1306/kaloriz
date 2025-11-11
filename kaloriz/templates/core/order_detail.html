@@ -152,6 +152,15 @@
               {{ order.get_status_display }}
             </span>
           </p>
+          <p><strong>Jenis Pengiriman:</strong><br>{{ order.selected_service_name|default:"-" }}</p>
+          <p><strong>Kurir:</strong><br>
+            {% if order.shipping_provider %}
+              {{ order.get_shipping_provider_display }}
+            {% else %}
+              -
+            {% endif %}
+          </p>
+          <p><strong>No. Resi:</strong><br>{{ order.tracking_number|default:"-" }}</p>
           {% if order.notes %}
           <p><strong>Catatan:</strong><br>{{ order.notes }}</p>
           {% endif %}

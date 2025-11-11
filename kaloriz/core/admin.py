@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 from .models import (
     Cart,
@@ -83,12 +84,41 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ['product', 'product_name', 'product_price', 'quantity', 'subtotal']
 
 
+class OrderAdminForm(forms.ModelForm):
+    shipping_provider = forms.ChoiceField(required=False, label="Kurir Pengiriman")
+
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        service_label = (self.instance.selected_service_name or '').strip().lower()
+        if not service_label:
+            courier_code = (self.instance.selected_courier or '').strip().lower()
+            if courier_code in {'exp', 'express'}:
+                service_label = 'express'
+        if service_label == 'express':
+            choices = list(Order.EXPRESS_COURIERS)
+        else:
+            choices = list(Order.REGULAR_COURIERS)
+
+        current_value = self.instance.shipping_provider
+        choice_map = dict(Order.SHIPPING_PROVIDER_CHOICES)
+        existing_values = {value for value, _ in choices}
+        if current_value and current_value not in existing_values:
+            choices.append((current_value, choice_map.get(current_value, current_value)))
+
+        self.fields['shipping_provider'].choices = [('', '---------')] + choices
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
+    form = OrderAdminForm
     list_display = ['order_number', 'user', 'full_name', 'status', 'total', 'created_at']
     list_filter = ['status', 'created_at']
     search_fields = ['order_number', 'user__username', 'full_name', 'email', 'phone']
-    readonly_fields = ['order_number', 'created_at', 'updated_at']
+    readonly_fields = ['order_number', 'created_at', 'updated_at', 'selected_courier', 'selected_service_name']
     inlines = [OrderItemInline]
     date_hierarchy = 'created_at'
 
@@ -97,7 +127,18 @@ class OrderAdmin(admin.ModelAdmin):
             'fields': ('order_number', 'user', 'status')
         }),
         ('Informasi Pengiriman', {
-            'fields': ('full_name', 'email', 'phone', 'address', 'city', 'postal_code')
+            'fields': (
+                'full_name',
+                'email',
+                'phone',
+                'address',
+                'city',
+                'postal_code',
+                'selected_service_name',
+                'selected_courier',
+                'shipping_provider',
+                'tracking_number',
+            )
         }),
         ('Total', {
             'fields': ('subtotal', 'shipping_cost', 'total')

@@ -126,6 +126,22 @@ class Order(models.Model):
         ('cancelled', 'Dibatalkan'),
     ]
 
+    REGULAR_COURIERS = [
+        ('JNE', 'JNE'),
+        ('JNT', 'J&T Express'),
+        ('SICEPAT', 'SiCepat Ekspres'),
+        ('POS', 'Pos Indonesia'),
+        ('TIKI', 'TIKI'),
+        ('LION', 'Lion Parcel'),
+        ('ANTERAJA', 'Anteraja'),
+        ('SAPX', 'SAPX Express'),
+    ]
+    EXPRESS_COURIERS = [
+        ('GOSEND', 'Gosend'),
+        ('GRAB', 'GrabExpress'),
+    ]
+    SHIPPING_PROVIDER_CHOICES = REGULAR_COURIERS + EXPRESS_COURIERS
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', verbose_name="Pengguna")
     order_number = models.CharField(max_length=100, unique=True, verbose_name="Nomor Pesanan")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Status")
@@ -159,6 +175,13 @@ class Order(models.Model):
         verbose_name="Layanan Kurir",
         help_text="REG/YES/OKE/etc"
     )
+    shipping_provider = models.CharField(
+        max_length=20,
+        choices=SHIPPING_PROVIDER_CHOICES,
+        blank=True,
+        verbose_name="Kurir Pengiriman",
+        help_text="Pilih kurir berdasarkan layanan pengiriman",
+    )
     total_weight_gram = models.PositiveIntegerField(
         default=1000,
         verbose_name="Total Berat (gram)",
@@ -172,6 +195,12 @@ class Order(models.Model):
 
     # Additional info
     notes = models.TextField(blank=True, verbose_name="Catatan")
+    tracking_number = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Nomor Resi",
+        help_text="Masukkan nomor resi pengiriman",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
