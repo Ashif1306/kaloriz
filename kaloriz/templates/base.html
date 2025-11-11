@@ -1,0 +1,827 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>{% block title %}Kaloriz - Toko Online{% endblock %}</title>
+
+  <!-- favicon -->
+  <link rel="shortcut icon" href="{% static 'images/favicon.png' %}" type="image/png">
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom Styles -->
+  <link href="{% static 'css/style.css' %}" rel="stylesheet" />
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+  <!-- Modern Minimalist Navbar -->
+  {% block navbar %}
+  <nav class="modern-navbar">
+    <div class="container">
+      <div class="navbar-content">
+        <!-- Left Menu -->
+        <div class="navbar-left">
+          {% with current_url=request.resolver_match.url_name %}
+          <a href="{% url 'catalog:home' %}" class="nav-link-modern {% if current_url == 'home' %}active{% endif %}">Home</a>
+          <a href="{% url 'catalog:product_list' %}" class="nav-link-modern {% if current_url == 'product_list' or current_url == 'product_detail' or current_url == 'category_detail' or current_url == 'search' %}active{% endif %}">Product</a>
+          <a href="{% url 'catalog:about' %}" class="nav-link-modern {% if current_url == 'about' %}active{% endif %}">Tentang</a>
+          <a href="{% url 'catalog:contact' %}" class="nav-link-modern {% if current_url == 'contact' %}active{% endif %}">Kontak</a>
+          {% endwith %}
+        </div>
+
+        <!-- Center Logo -->
+        <div class="navbar-center">
+          <a href="{% url 'catalog:home' %}" class="navbar-logo">
+            <img src="{% static 'images/logo.png' %}" alt="Kaloriz" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span style="display: none; font-size: 1.5rem; font-weight: bold; color: #667eea;">Kaloriz</span>
+          </a>
+        </div>
+
+        <!-- Right Icons -->
+        <div class="navbar-right">
+          <!-- Search Bar -->
+          <div class="search-wrapper">
+            <form action="{% url 'catalog:search' %}" method="get" class="search-form">
+              <input type="search" name="q" placeholder="Cari produk..." class="search-input">
+              <button type="submit" class="search-btn">
+                <i class="fas fa-search"></i>
+              </button>
+            </form>
+          </div>
+
+          <!-- Cart Icon with Badge -->
+          {% if user.is_authenticated %}
+          <div class="nav-icon-wrapper">
+            <a href="{% url 'core:cart' %}" class="nav-icon">
+              <i class="fas fa-shopping-cart"></i>
+              {% if cart_count > 0 %}
+              <span class="icon-badge">{{ cart_count }}</span>
+              {% endif %}
+            </a>
+          </div>
+          {% else %}
+          <div class="nav-icon-wrapper">
+            <a href="{% url 'core:login' %}" class="nav-icon">
+              <i class="fas fa-shopping-cart"></i>
+            </a>
+          </div>
+          {% endif %}
+
+          <!-- Profile Icon -->
+          {% if user.is_authenticated %}
+          <div class="nav-icon-wrapper">
+            <a href="{% url 'core:profile' %}" class="nav-icon" title="Profil">
+              <i class="fas fa-user"></i>
+            </a>
+          </div>
+          {% else %}
+          <div class="nav-icon-wrapper">
+            <a href="{% url 'core:login' %}" class="nav-icon" title="Login">
+              <i class="fas fa-user"></i>
+            </a>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Mobile Toggle -->
+        <button class="mobile-toggle" type="button" aria-label="Toggle navigation" onclick="toggleMobileMenu()">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+      <!-- Mobile Menu -->
+      <div id="mobile-menu" class="mobile-menu">
+        {% with current_url=request.resolver_match.url_name %}
+        <a href="{% url 'catalog:home' %}" class="mobile-menu-link {% if current_url == 'home' %}active{% endif %}">Home</a>
+        <a href="{% url 'catalog:product_list' %}" class="mobile-menu-link {% if current_url == 'product_list' or current_url == 'product_detail' or current_url == 'category_detail' or current_url == 'search' %}active{% endif %}">Product</a>
+        <a href="{% url 'catalog:about' %}" class="mobile-menu-link {% if current_url == 'about' %}active{% endif %}">Tentang</a>
+        <a href="{% url 'catalog:contact' %}" class="mobile-menu-link {% if current_url == 'contact' %}active{% endif %}">Kontak</a>
+        {% endwith %}
+        <div class="mobile-menu-divider"></div>
+        <div class="mobile-menu-icons">
+          {% if user.is_authenticated %}
+          <a href="{% url 'core:profile' %}" class="mobile-icon-link" title="Profil">
+            <i class="fas fa-user"></i>
+            <span>Profil</span>
+          </a>
+          <a href="{% url 'core:cart' %}" class="mobile-icon-link" title="Keranjang">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Keranjang</span>
+          </a>
+          {% else %}
+          <a href="{% url 'core:login' %}" class="mobile-icon-link" title="Login">
+            <i class="fas fa-user"></i>
+            <span>Login</span>
+          </a>
+          <a href="{% url 'core:login' %}" class="mobile-icon-link" title="Keranjang">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Keranjang</span>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+  {% endblock %}
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <style>
+  :root {
+    --header-h: 72px;
+  }
+
+  main {
+    padding-top: var(--header-h);
+  }
+
+  /* Modern Minimalist Navbar */
+  .modern-navbar {
+    background: rgba(255, 255, 255, 0);
+    box-shadow: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 15px 0;
+    transition: background-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease;
+  }
+
+  .modern-navbar .container {
+    position: relative;
+  }
+
+  .navbar-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+  }
+
+  /* Left Menu */
+  .navbar-left {
+    display: flex;
+    gap: 30px;
+    flex: 1;
+  }
+
+  .nav-link-modern {
+    color: #2d3748;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    position: relative;
+    padding-bottom: 5px;
+    transition: color 0.3s ease;
+  }
+
+  .nav-link-modern:hover {
+    color: #667eea;
+  }
+
+  .nav-link-modern::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #38b6ff;
+    transition: width 0.3s ease;
+  }
+
+  .nav-link-modern:hover::after {
+    width: 100%;
+  }
+
+  .nav-link-modern.active {
+    color: #38b6ff;
+  }
+
+  .nav-link-modern.active::after {
+    width: 100%;
+  }
+
+  .modern-navbar.is-sticky {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 18px 35px rgba(56, 182, 255, 0.22);
+    backdrop-filter: blur(12px);
+    animation: navbarSlideDown 0.4s ease forwards;
+  }
+
+  @keyframes navbarSlideDown {
+    from {
+      transform: translateY(-100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* Center Logo */
+  .navbar-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .navbar-logo img {
+    height: 45px;
+    object-fit: contain;
+  }
+
+  /* Right Icons */
+  .navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .nav-icon-wrapper {
+    position: relative;
+  }
+
+  .nav-icon {
+    color: #2d3748;
+    font-size: 1.2rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-block;
+    position: relative;
+  }
+
+  .nav-icon:hover {
+    color: #667eea;
+    transform: scale(1.1);
+  }
+
+  .icon-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #ff416c, #ff4b2b);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* Search Bar */
+  .search-wrapper {
+    position: relative;
+  }
+
+  .search-form {
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 25px;
+    padding: 5px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .search-form:focus-within {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  }
+
+  .search-input {
+    border: none;
+    outline: none;
+    padding: 5px 10px;
+    font-size: 0.9rem;
+    width: 180px;
+    background: transparent;
+  }
+
+  .search-btn {
+    background: none;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 5px;
+    transition: transform 0.3s ease;
+  }
+
+  .search-btn:hover {
+    transform: scale(1.1);
+  }
+
+  /* Mobile Toggle */
+  .mobile-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #2d3748;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+
+  .mobile-toggle.is-active {
+    color: #667eea;
+  }
+
+  .mobile-toggle i {
+    transition: transform 0.3s ease;
+  }
+
+  .mobile-toggle.is-active i {
+    transform: rotate(90deg);
+  }
+
+  .mobile-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 15px);
+    right: 0;
+    left: 0;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 18px 35px rgba(56, 182, 255, 0.12);
+    border-radius: 16px;
+    padding: 20px 24px;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.3s ease;
+  }
+
+  .mobile-menu.open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .mobile-menu-link {
+    display: block;
+    color: #2d3748;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.15);
+    transition: color 0.3s ease;
+  }
+
+  .mobile-menu-link:last-of-type {
+    border-bottom: none;
+  }
+
+  .mobile-menu-link:hover,
+  .mobile-menu-link.active {
+    color: #667eea;
+  }
+
+  .mobile-menu-divider {
+    height: 1px;
+    background: rgba(102, 126, 234, 0.15);
+    margin: 15px 0;
+  }
+
+  .mobile-menu-icons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .mobile-icon-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.08);
+    color: #2d3748;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .mobile-icon-link i {
+    font-size: 1.1rem;
+  }
+
+  .mobile-icon-link:hover {
+    background: rgba(102, 126, 234, 0.18);
+    color: #667eea;
+  }
+
+  @media (max-width: 992px) {
+    .navbar-left {
+      display: none;
+    }
+
+    .navbar-center {
+      position: static;
+      transform: none;
+    }
+
+    .mobile-toggle {
+      display: block;
+    }
+
+    .navbar-right {
+      gap: 15px;
+    }
+
+    .search-input {
+      width: 120px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .navbar-left,
+    .navbar-right,
+    .search-wrapper {
+      display: none !important;
+    }
+
+    .navbar-content {
+      justify-content: space-between;
+    }
+
+    .navbar-center {
+      position: static;
+      transform: none;
+    }
+
+    .mobile-toggle {
+      display: block;
+    }
+
+    .mobile-menu {
+      display: block;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .search-input {
+      width: 100px;
+      font-size: 0.85rem;
+    }
+
+    .nav-icon {
+      font-size: 1.1rem;
+    }
+
+    .navbar-logo img {
+      height: 35px;
+    }
+  }
+  </style>
+
+  <!-- Messages -->
+  {% if messages %}
+  <div id="django-message-storage" class="d-none" aria-hidden="true">
+    {% for message in messages %}
+    <span class="django-message" data-tags="{{ message.tags }}" data-message="{{ message|escape }}"></span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Content -->
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-dark text-white mt-5 py-4">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4">
+          <h5><i class="fas fa-shopping-bag"></i> Kaloriz</h5>
+          <p>Toko online terpercaya dengan berbagai pilihan produk berkualitas.</p>
+        </div>
+        <div class="col-md-4">
+          <h5>Link Cepat</h5>
+          <ul class="list-unstyled">
+            <li><a href="{% url 'catalog:home' %}" class="text-white">Home</a></li>
+            <li><a href="{% url 'catalog:product_list' %}" class="text-white">Produk</a></li>
+            {% if user.is_authenticated %}
+              <li><a href="{% url 'core:order_list' %}" class="text-white">Pesanan Saya</a></li>
+            {% endif %}
+          </ul>
+        </div>
+        <div class="col-md-4">
+          <h5>Kontak</h5>
+          <p>
+            <i class="fas fa-envelope"></i> info@kaloriz.com<br>
+            <i class="fas fa-phone"></i> +62 123 456 7890
+          </p>
+        </div>
+      </div>
+      <hr class="bg-white">
+      <div class="text-center">
+        <div class="social-icons mb-3">
+          <a href="#" class="text-white mx-2" style="font-size: 1.5rem;" title="Facebook">
+            <i class="fab fa-facebook"></i>
+          </a>
+          <a href="#" class="text-white mx-2" style="font-size: 1.5rem;" title="Twitter">
+            <i class="fab fa-twitter"></i>
+          </a>
+          <a href="#" class="text-white mx-2" style="font-size: 1.5rem;" title="YouTube">
+            <i class="fab fa-youtube"></i>
+          </a>
+          <a href="#" class="text-white mx-2" style="font-size: 1.5rem;" title="Instagram">
+            <i class="fab fa-instagram"></i>
+          </a>
+        </div>
+        <p class="mb-0">&copy; 2025 Kaloriz. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <style>
+  .social-icons a {
+    transition: transform 0.3s ease, color 0.3s ease;
+    display: inline-block;
+  }
+
+  .social-icons a:hover {
+    transform: translateY(-3px);
+    color: #ffc107 !important;
+  }
+
+  .toast-container {
+    position: fixed;
+    top: calc(var(--header-h) + 20px);
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+  }
+
+  .toast-message {
+    min-width: 280px;
+    max-width: 360px;
+    background: rgba(17, 24, 39, 0.92);
+    color: #fff;
+    padding: 14px 18px;
+    border-radius: 14px;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    pointer-events: auto;
+  }
+
+  .toast-message.show {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .toast-message.success {
+    border-left: 4px solid #22c55e;
+  }
+
+  .toast-message.error {
+    border-left: 4px solid #f87171;
+  }
+
+  .toast-message .toast-icon {
+    font-size: 1.2rem;
+  }
+  </style>
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  function getCookie(name){
+    let v = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+    return v ? decodeURIComponent(v.split('=')[1]) : null;
+  }
+
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) {
+      return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-message ${type}`;
+
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.textContent = type === 'success' ? '✅' : '❌';
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    toast.appendChild(icon);
+    toast.appendChild(text);
+    container.appendChild(toast);
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.remove();
+      }, 400);
+    }, 3500);
+  }
+
+  function toggleMobileMenu() {
+    const menu = document.getElementById('mobile-menu');
+    const toggle = document.querySelector('.mobile-toggle');
+
+    if (!menu || !toggle) {
+      return;
+    }
+
+    menu.classList.toggle('open');
+    toggle.classList.toggle('is-active');
+  }
+
+  document.addEventListener('click', (event) => {
+    const menu = document.getElementById('mobile-menu');
+    const toggle = document.querySelector('.mobile-toggle');
+
+    if (!menu || !toggle) {
+      return;
+    }
+
+    const clickedToggle = toggle.contains(event.target);
+    const clickedInsideMenu = menu.contains(event.target);
+
+    if (!clickedToggle && !clickedInsideMenu) {
+      menu.classList.remove('open');
+      toggle.classList.remove('is-active');
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const menu = document.getElementById('mobile-menu');
+    if (!menu) {
+      return;
+    }
+
+    const links = menu.querySelectorAll('.mobile-menu-link, .mobile-icon-link');
+    const toggle = document.querySelector('.mobile-toggle');
+
+    links.forEach((link) => {
+      link.addEventListener('click', () => {
+        menu.classList.remove('open');
+        if (toggle) {
+          toggle.classList.remove('is-active');
+        }
+      });
+    });
+  });
+
+  function updateCartBadge(count) {
+    const cartLink = document.querySelector('.navbar-right .nav-icon-wrapper a[href$="/cart/"]');
+    if (!cartLink) {
+      return;
+    }
+
+    let badge = cartLink.querySelector('.icon-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'icon-badge';
+        cartLink.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  function attachCartFormHandlers() {
+    const forms = document.querySelectorAll('form.js-add-to-cart-form');
+    forms.forEach((form) => {
+      if (form.dataset.ajaxBound === 'true') {
+        return;
+      }
+
+      form.dataset.ajaxBound = 'true';
+
+      form.addEventListener('submit', function (event) {
+        const submitButton = form.querySelector('[type="submit"]');
+        if (submitButton && submitButton.hasAttribute('disabled')) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': getCookie('csrftoken') || ''
+          },
+          body: formData
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+              const message = data.message || 'Terjadi kesalahan. Silakan coba lagi.';
+              showToast(message, 'error');
+              return;
+            }
+
+            showToast(data.message || 'Produk berhasil ditambahkan ke keranjang.', 'success');
+            if (typeof data.cart_count !== 'undefined') {
+              updateCartBadge(data.cart_count);
+            }
+          })
+          .catch(() => {
+            showToast('Terjadi kesalahan jaringan. Silakan coba lagi.', 'error');
+          });
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachCartFormHandlers);
+  } else {
+    attachCartFormHandlers();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const messageStorage = document.getElementById('django-message-storage');
+    if (!messageStorage) {
+      return;
+    }
+
+    const messageElements = messageStorage.querySelectorAll('.django-message');
+    messageElements.forEach((element) => {
+      const tags = (element.dataset.tags || '').split(' ');
+      const text = element.dataset.message || '';
+      if (!text) {
+        return;
+      }
+
+      const hasError = tags.some((tag) => ['error', 'danger', 'warning'].includes(tag));
+      const type = hasError ? 'error' : 'success';
+      showToast(text, type);
+    });
+
+    messageStorage.remove();
+  });
+
+  (function() {
+    const root = document.documentElement;
+    const header = document.querySelector('.modern-navbar');
+
+    if (!root || !header) {
+      return;
+    }
+
+    function updateHeaderHeight() {
+      const height = header.offsetHeight || 0;
+      root.style.setProperty('--header-h', `${height}px`);
+    }
+
+    function handleScroll() {
+      if (window.scrollY > 10) {
+        header.classList.add('is-sticky');
+      } else {
+        header.classList.remove('is-sticky');
+      }
+    }
+
+    updateHeaderHeight();
+    handleScroll();
+
+    window.addEventListener('load', () => {
+      updateHeaderHeight();
+      handleScroll();
+    });
+    window.addEventListener('resize', updateHeaderHeight);
+    document.addEventListener('scroll', handleScroll, { passive: true });
+  })();
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,42 @@
+{% extends 'core/profile_layout.html' %}
+
+{% block title %}Notifikasi - Kaloriz{% endblock %}
+
+{% block profile_content %}
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Notifikasi</h2>
+      <p>Dapatkan kabar terbaru mengenai pesanan dan promosi Anda.</p>
+    </div>
+  </div>
+
+  {% if notifications %}
+    <div class="profile-notification-list">
+      {% for notification in notifications %}
+      <div class="notification-card notification-{{ notification.level|default:'info' }}">
+        <div class="notification-icon">
+          <i class="{{ notification.icon|default:'fas fa-bell' }}"></i>
+        </div>
+        <div class="notification-content">
+          <div class="notification-header">
+            <h4>{{ notification.title }}</h4>
+            <span class="notification-time">{{ notification.timestamp|default:'' }}</span>
+          </div>
+          <p>{{ notification.message }}</p>
+          {% if notification.action_url %}
+          <a href="{{ notification.action_url }}" class="btn btn-primary btn-sm">{{ notification.action_label|default:'Lihat detail' }}</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="profile-empty">
+      <i class="fas fa-bell"></i>
+      <h4>Belum ada notifikasi</h4>
+      <p>Kami akan mengirimkan pemberitahuan terbaru mengenai aktivitas akun Anda.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

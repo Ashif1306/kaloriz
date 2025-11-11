@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register - Kaloriz{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --header-h: 0px;
+  }
+</style>
+{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-page auth-page--register">
+  <div class="auth-card">
+    <div class="auth-content">
+      <div class="auth-header">
+        <span class="auth-badge"><i class="fas fa-user-plus"></i> Buat akun</span>
+        <h2>Bergabung dan Nikmati Pengalaman Belanja Premium</h2>
+        <p>Dapatkan akses ke kurasi produk terbaru, wishlist pribadi, hingga promo eksklusif yang dikirimkan langsung ke inbox Anda.</p>
+      </div>
+
+      <form method="post" class="auth-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="auth-message auth-message--error">
+            {{ form.non_field_errors|join:' ' }}
+          </div>
+        {% endif %}
+
+        <div class="auth-field">
+          <label for="{{ form.first_name.id_for_label }}" class="auth-label">{{ form.first_name.label }}</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}
+            <small class="text-danger d-block mt-2">{{ form.first_name.errors.0 }}</small>
+          {% endif %}
+        </div>
+
+        <div class="auth-field">
+          <label for="{{ form.email.id_for_label }}" class="auth-label">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}
+            <small class="text-danger d-block mt-2">{{ form.email.errors.0 }}</small>
+          {% endif %}
+        </div>
+
+        <div class="auth-field">
+          <label for="{{ form.password1.id_for_label }}" class="auth-label">{{ form.password1.label }}</label>
+          {{ form.password1 }}
+          <small class="verification-help d-block mt-1">Gunakan kombinasi huruf, angka, dan simbol untuk keamanan maksimal.</small>
+          {% if form.password1.errors %}
+            <small class="text-danger d-block mt-2">{{ form.password1.errors.0 }}</small>
+          {% endif %}
+        </div>
+
+        <div class="auth-field">
+          <label for="{{ form.password2.id_for_label }}" class="auth-label">{{ form.password2.label }}</label>
+          {{ form.password2 }}
+          {% if form.password2.errors %}
+            <small class="text-danger d-block mt-2">{{ form.password2.errors.0 }}</small>
+          {% endif %}
+        </div>
+
+        <button type="submit" class="auth-submit">Daftar Sekarang</button>
+      </form>
+
+      <p class="auth-meta">Sudah punya akun? <a href="{% url 'core:login' %}">Masuk di sini</a></p>
+    </div>
+
+    <div class="auth-visual">
+      <div class="auth-illustration">
+        <img src="{% static 'images/auth-illustration.svg' %}" alt="Kaloriz onboarding" loading="lazy">
+      </div>
+      <div class="auth-visual-content">
+        <span class="auth-pill">Proses registrasi yang mulus</span>
+        <h3>Mulai personalisasi rekomendasi hanya dalam hitungan menit</h3>
+        <p class="auth-description">Verifikasi email instan, kelola alamat pengiriman, dan simpan preferensi Anda sejak awal.</p>
+        <div class="auth-message auth-message--accent">
+          <i class="fas fa-envelope-open-text"></i>
+          Email verifikasi akan dikirim otomatis. Pastikan alamat email aktif agar tidak melewatkan notifikasi penting.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

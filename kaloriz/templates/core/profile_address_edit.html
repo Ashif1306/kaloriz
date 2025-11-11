@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Alamat Pengiriman - Kaloriz{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="fas fa-shipping-fast"></i> Edit Alamat Pengiriman</h5>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-4">
+            <i class="fas fa-info-circle"></i>
+            Alamat ini akan digunakan untuk perhitungan ongkir otomatis melalui API RajaOngkir.
+            Pastikan data yang diisi akurat.
+          </p>
+
+          <form method="post">
+            {% csrf_token %}
+
+            <!-- Identitas Penerima -->
+            <div class="form-group">
+              <label for="{{ form.full_name.id_for_label }}">{{ form.full_name.label }} <span class="text-danger">*</span></label>
+              {{ form.full_name }}
+              {% if form.full_name.errors %}
+                <div class="text-danger small">{{ form.full_name.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="form-group">
+              <label for="{{ form.phone.id_for_label }}">{{ form.phone.label }} <span class="text-danger">*</span></label>
+              {{ form.phone }}
+              {% if form.phone.errors %}
+                <div class="text-danger small">{{ form.phone.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="form-group">
+              <label for="{{ form.address_line.id_for_label }}">{{ form.address_line.label }}</label>
+              {{ form.address_line }}
+              {% if form.address_line.errors %}
+                <div class="text-danger small">{{ form.address_line.errors }}</div>
+              {% endif %}
+            </div>
+
+            <hr>
+            <h6 class="text-success"><i class="fas fa-map-marker-alt"></i> Lokasi Tujuan</h6>
+
+            <!-- Provinsi (readonly) -->
+            <div class="form-group">
+              <label for="{{ form.province_name.id_for_label }}">{{ form.province_name.label }}</label>
+              {{ form.province_name }}
+              <small class="form-text text-muted">Saat ini hanya melayani Sulawesi Selatan</small>
+            </div>
+
+            <!-- Kota -->
+            <div class="form-group">
+              <label for="{{ form.city_name.id_for_label }}">{{ form.city_name.label }}</label>
+              {{ form.city_name }}
+              {% if form.city_name.errors %}
+                <div class="text-danger small">{{ form.city_name.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Kecamatan -->
+            <div class="form-group">
+              <label for="{{ form.subdistrict_name.id_for_label }}">{{ form.subdistrict_name.label }}</label>
+              {{ form.subdistrict_name }}
+              {% if form.subdistrict_name.errors %}
+                <div class="text-danger small">{{ form.subdistrict_name.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- ID Kecamatan (manual input sementara) -->
+            <div class="form-group">
+              <label for="{{ form.destination_subdistrict_id.id_for_label }}">{{ form.destination_subdistrict_id.label }}</label>
+              {{ form.destination_subdistrict_id }}
+              <small class="form-text text-muted">
+                {{ form.destination_subdistrict_id.help_text }}
+                <br>
+                <strong>Catatan:</strong> Untuk sekarang, masukkan ID kecamatan secara manual.
+                Setelah integrasi API RajaOngkir, field ini akan terisi otomatis.
+              </small>
+              {% if form.destination_subdistrict_id.errors %}
+                <div class="text-danger small">{{ form.destination_subdistrict_id.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Kode Pos -->
+            <div class="form-group">
+              <label for="{{ form.postal_code.id_for_label }}">{{ form.postal_code.label }}</label>
+              {{ form.postal_code }}
+              {% if form.postal_code.errors %}
+                <div class="text-danger small">{{ form.postal_code.errors }}</div>
+              {% endif %}
+            </div>
+
+            <hr>
+
+            <!-- Alamat Primary -->
+            <div class="form-check mb-3">
+              {{ form.is_default }}
+              <label class="form-check-label" for="{{ form.is_default.id_for_label }}">
+                {{ form.is_default.label }}
+              </label>
+            </div>
+
+            <!-- Buttons -->
+            <div class="text-right">
+              <a href="{% url 'core:profile' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Batal
+              </a>
+              <button type="submit" class="btn btn-success">
+                <i class="fas fa-save"></i> Simpan Alamat
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Info Box -->
+      <div class="alert alert-info mt-3">
+        <h6><i class="fas fa-lightbulb"></i> Tips:</h6>
+        <ul class="mb-0">
+          <li>Pastikan nomor telepon aktif dan dapat dihubungi oleh kurir</li>
+          <li>Alamat harus lengkap dan detail untuk mempermudah pengiriman</li>
+          <li>ID Kecamatan dapat ditemukan di dokumentasi RajaOngkir API atau hubungi admin</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

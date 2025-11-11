@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}Pesanan {{ order.order_number }} - Kaloriz{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <h2><i class="fas fa-receipt"></i> Detail Pesanan</h2>
+      <p class="text-muted">Pesanan #{{ order.order_number }}</p>
+    </div>
+    <div class="col-md-4 text-right">
+      <span class="badge badge-{{ order.get_status_display_class }} badge-lg p-3">
+        {{ order.get_status_display }}
+      </span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <!-- Order Items -->
+      <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Item Pesanan</h5>
+        </div>
+        <div class="card-body">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Produk</th>
+                <th>Harga</th>
+                <th>Jumlah</th>
+                <th>Subtotal</th>
+                <th>Penilaian</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in order_items %}
+              <tr>
+                <td class="align-middle">
+                  <strong>{{ item.product_name }}</strong>
+                </td>
+                <td class="align-middle">Rp {{ item.product_price|floatformat:0 }}</td>
+                <td class="align-middle">{{ item.quantity }}</td>
+                <td class="align-middle"><strong>Rp {{ item.subtotal|floatformat:0 }}</strong></td>
+                <td class="align-middle">
+                  {% if item.product %}
+                    {% if item.existing_testimonial %}
+                      <span class="badge badge-success mb-2"><i class="fas fa-check"></i> Sudah Dinilai</span>
+                      <div class="mb-1 text-warning font-weight-bold">
+                        <i class="fas fa-star"></i> {{ item.existing_testimonial.rating }} / 5
+                      </div>
+                      <p class="small mb-0 text-muted">"{{ item.existing_testimonial.review }}"</p>
+                    {% elif order_can_review %}
+                      <button class="btn btn-outline-primary btn-sm" type="button" data-toggle="modal" data-target="#reviewModal{{ item.id }}">
+                        <i class="fas fa-star"></i> Beri Penilaian
+                      </button>
+
+                      <div class="modal fade" id="reviewModal{{ item.id }}" tabindex="-1" role="dialog" aria-labelledby="reviewModalLabel{{ item.id }}" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="reviewModalLabel{{ item.id }}">Beri Penilaian - {{ item.product_name }}</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <form method="post" action="{% url 'core:submit_testimonial' order.order_number item.id %}" enctype="multipart/form-data">
+                              <div class="modal-body">
+                                {% csrf_token %}
+                                <div class="form-group mb-3">
+                                  <label class="small font-weight-bold" for="rating{{ item.id }}">{{ testimonial_form.fields.rating.label }}</label>
+                                  <select id="rating{{ item.id }}" name="rating" class="custom-select custom-select-sm" required>
+                                    <option value="" disabled selected>Pilih rating</option>
+                                    {% for value, label in testimonial_form.fields.rating.choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                  </select>
+                                </div>
+                                <div class="form-group mb-3">
+                                  <label class="small font-weight-bold" for="review{{ item.id }}">{{ testimonial_form.fields.review.label }}</label>
+                                  <textarea id="review{{ item.id }}" name="review" class="form-control form-control-sm" rows="3" placeholder="{{ testimonial_form.fields.review.widget.attrs.placeholder }}" required></textarea>
+                                </div>
+                                <div class="form-group mb-0">
+                                  <label class="small font-weight-bold" for="photo{{ item.id }}">{{ testimonial_form.fields.photo.label }}</label>
+                                  <input id="photo{{ item.id }}" type="file" name="photo" class="form-control-file" accept="image/*">
+                                  <small class="form-text text-muted">Opsional: unggah foto pendukung (maksimal 1).</small>
+                                </div>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-dismiss="modal">Batal</button>
+                                <button type="submit" class="btn btn-success btn-sm">Kirim Penilaian</button>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    {% else %}
+                      <small class="text-muted">Penilaian tersedia setelah pesanan selesai.</small>
+                    {% endif %}
+                  {% else %}
+                    <small class="text-muted">Produk tidak tersedia.</small>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="text-right"><strong>Subtotal:</strong></td>
+                <td><strong>Rp {{ order.subtotal|floatformat:0 }}</strong></td>
+              </tr>
+              <tr>
+                <td colspan="4" class="text-right"><strong>Ongkir:</strong></td>
+                <td><strong>Rp {{ order.shipping_cost|floatformat:0 }}</strong></td>
+              </tr>
+              <tr class="table-success">
+                <td colspan="4" class="text-right"><strong>Total:</strong></td>
+                <td><strong>Rp {{ order.total|floatformat:0 }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Shipping Address -->
+      <div class="card shadow">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">Alamat Pengiriman</h5>
+        </div>
+        <div class="card-body">
+          <p class="mb-1"><strong>{{ order.full_name }}</strong></p>
+          <p class="mb-1">{{ order.address }}</p>
+          <p class="mb-1">{{ order.city }}, {{ order.postal_code }}</p>
+          <p class="mb-1"><i class="fas fa-phone"></i> {{ order.phone }}</p>
+          <p class="mb-0"><i class="fas fa-envelope"></i> {{ order.email }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <!-- Order Info -->
+      <div class="card shadow mb-4">
+        <div class="card-header bg-secondary text-white">
+          <h5 class="mb-0">Informasi Pesanan</h5>
+        </div>
+        <div class="card-body">
+          <p><strong>No. Pesanan:</strong><br>{{ order.order_number }}</p>
+          <p><strong>Tanggal Pesanan:</strong><br>{{ order.created_at|date:"d M Y H:i" }}</p>
+          <p><strong>Status:</strong><br>
+            <span class="badge badge-{{ order.get_status_display_class }}">
+              {{ order.get_status_display }}
+            </span>
+          </p>
+          {% if order.notes %}
+          <p><strong>Catatan:</strong><br>{{ order.notes }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <a href="{% url 'core:order_list' %}" class="btn btn-outline-primary btn-block">
+        <i class="fas fa-arrow-left"></i> Kembali ke Daftar Pesanan
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

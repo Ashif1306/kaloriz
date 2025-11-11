@@ -1,0 +1,725 @@
+{% extends 'base.html' %}
+
+{% block title %}Review Pesanan - Kaloriz{% endblock %}
+
+{% block content %}
+<div class="container my-5 checkout-review-container">
+  <div class="checkout-steps mb-5">
+    <div class="step completed">
+      <div class="step-number">1</div>
+      <div class="step-label">Alamat</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step completed">
+      <div class="step-number">2</div>
+      <div class="step-label">Metode Pembayaran</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step active">
+      <div class="step-number">3</div>
+      <div class="step-label">Review</div>
+    </div>
+  </div>
+
+  <div class="text-center mb-5">
+    <h2 class="mb-2">Review Pesanan</h2>
+    <p class="text-muted mb-0">Periksa detail produk, alamat pengiriman, dan metode pembayaran sebelum melanjutkan.</p>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-8 mb-4">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Alamat Pengiriman</h5>
+          <span class="badge badge-light text-uppercase font-weight-semibold">{{ shipping_address.label }}</span>
+        </div>
+        <div class="card-body">
+          <div class="d-flex align-items-start">
+            <div class="shipping-avatar mr-3">
+              <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <div>
+              <div class="font-weight-semibold">{{ shipping_address.full_name }}</div>
+              <div class="text-muted small">{{ shipping_address.phone }}</div>
+              <p class="text-muted small mb-2">{{ shipping_address.get_full_address }}</p>
+            </div>
+          </div>
+          <div class="shipping-meta mt-3">
+            <div class="d-flex flex-wrap mb-2">
+              <span class="meta-label mr-2">Kurir:</span>
+              <span class="meta-value">{{ shipping_method_label }}</span>
+            </div>
+            {% if eta %}
+            <div class="d-flex flex-wrap mb-2">
+              <span class="meta-label mr-2">Estimasi tiba:</span>
+              <span class="meta-value">{{ eta }}</span>
+            </div>
+            {% endif %}
+            <div class="d-flex flex-wrap">
+              <span class="meta-label mr-2">Pembayaran:</span>
+              <span class="meta-value text-uppercase">{{ payment_method_display }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h5 class="mb-0">Produk Dipilih</h5>
+        </div>
+        <div class="card-body">
+          {% if selected_items %}
+            <ul class="list-unstyled mb-0">
+              {% for item in selected_items %}
+              <li class="checkout-item d-flex justify-content-between align-items-start py-3">
+                <div class="pr-3">
+                  <div class="font-weight-semibold">{{ item.product.name }}</div>
+                  <div class="text-muted small">{{ item.quantity }} x Rp {{ item.product.get_display_price|floatformat:0 }}</div>
+                </div>
+                <div class="text-right font-weight-semibold">Rp {{ item.get_subtotal|floatformat:0 }}</div>
+              </li>
+              {% if not forloop.last %}
+              <li class="divider"></li>
+              {% endif %}
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted mb-0">Belum ada produk yang dipilih.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow checkout-summary-card summary" id="checkout-summary-card">
+        <div class="card-header bg-white border-bottom">
+          <h5 class="mb-0">Ringkasan Pembayaran</h5>
+        </div>
+        <div
+          class="card-body"
+          id="checkout-summary"
+          data-apply-url="{% url 'catalog:apply_discount' %}"
+          data-cancel-url="{% url 'catalog:cancel_discount' %}"
+        >
+          <div class="summary-row d-flex justify-content-between mb-3">
+            <span>Subtotal</span>
+            <span class="font-weight-semibold" id="subtotal-amount">{{ subtotal_display }}</span>
+          </div>
+          <div class="summary-row d-flex justify-content-between mb-3">
+            <span>Ongkir</span>
+            <span class="text-danger font-weight-semibold" id="shipping-cost-amount">{{ shipping_cost_display }}</span>
+          </div>
+          <div class="summary-row d-flex justify-content-between mb-3">
+            <span>Metode Pembayaran</span>
+            <span class="text-primary font-weight-semibold text-uppercase">{{ payment_method_display }}</span>
+          </div>
+          <div class="summary-row d-flex justify-content-between mb-3">
+            <span>Metode Pengiriman</span>
+            <span class="text-muted">{{ shipping_method_label }}</span>
+          </div>
+
+          <div class="discount-wrapper mb-3">
+            <label for="discount-code-input" class="font-weight-semibold">Kode Diskon</label>
+            <div class="input-group align-items-center">
+              <input type="text" id="discount-code-input" class="form-control" placeholder="Masukkan kode" value="{{ discount_code|default:'' }}">
+              <div class="input-group-append">
+                <button class="btn btn-outline-primary{% if discount_amount > 0 %} d-none{% endif %}" type="button" id="apply-discount-btn">Apply</button>
+                <button class="btn btn-outline-secondary ml-1{% if discount_amount == 0 %} d-none{% endif %}" type="button" id="cancel-discount-btn">Batalkan</button>
+              </div>
+            </div>
+            <small class="form-text text-muted">Masukkan kode voucher untuk mendapatkan potongan harga.</small>
+          </div>
+
+          <div class="summary-row d-flex justify-content-between align-items-start mb-3" id="discount-row">
+            <div>
+              <span>Diskon</span>
+              <div class="discount-summary-meta text-muted small mt-1{% if not discount_code %} d-none{% endif %}" id="discount-summary">
+                <span class="badge badge-success text-uppercase mr-2" id="discount-code-display">{{ discount_code }}</span>
+                <span id="discount-type-display">{{ discount_type_label }}</span>
+              </div>
+            </div>
+            <span class="text-success font-weight-semibold" id="discount-amount-display">{% if discount_amount > 0 %}-{{ discount_display }}{% else %}{{ discount_display }}{% endif %}</span>
+          </div>
+
+          <hr>
+          <div class="d-flex justify-content-between align-items-center">
+            <strong>Total Akhir</strong>
+            <strong class="text-dark h4 mb-0" id="total-amount">{{ total_display }}</strong>
+          </div>
+
+          <div
+            id="checkout-summary-data"
+            data-subtotal="{{ subtotal_raw }}"
+            data-shipping-cost="{{ shipping_cost_raw }}"
+            data-discount="{{ discount_amount_raw }}"
+            data-total="{{ total_raw }}"
+            class="d-none"
+          ></div>
+
+          <button
+            type="button"
+            class="btn btn-primary btn-lg w-100 mt-4"
+            id="btn-checkout"
+            data-payment-method="{{ payment_method }}"
+          >
+            {{ payment_method_button_label }}
+          </button>
+          {% if payment_method_additional_info %}
+          <p class="text-muted small text-center mt-2 mb-0">{{ payment_method_additional_info|linebreaksbr }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.checkout-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkout-steps .step {
+  text-align: center;
+  position: relative;
+}
+
+.checkout-steps .step-number {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  border-radius: 50%;
+  background: #f1f1f1;
+  color: #6c757d;
+  font-weight: 600;
+  margin: 0 auto 8px;
+}
+
+.checkout-steps .step-label {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.checkout-steps .step-line {
+  flex-grow: 1;
+  height: 2px;
+  background: #e0e0e0;
+  margin: 0 15px;
+}
+
+.checkout-steps .step.completed .step-number {
+  background: #28a745;
+  color: #fff;
+}
+
+.checkout-steps .step.active .step-number {
+  background: #343a40;
+  color: #fff;
+}
+
+.checkout-summary-card.summary {
+  position: sticky;
+  top: calc(var(--header-h) + 12px);
+  z-index: 10;
+  bottom: 16px;
+}
+
+.discount-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.discount-summary-meta .badge {
+  font-weight: 600;
+}
+
+.shipping-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(52, 58, 64, 0.1);
+  color: #343a40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.shipping-meta .meta-label {
+  font-weight: 600;
+  color: #495057;
+}
+
+.checkout-item + .divider {
+  border-bottom: 1px dashed #e9ecef;
+}
+
+.discount-wrapper .input-group .form-control {
+  border-right: 0;
+}
+
+.discount-wrapper .input-group .btn {
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+
+@media (max-width: 992px) {
+  .checkout-summary-card.summary {
+    position: static;
+    top: auto;
+    bottom: auto;
+  }
+}
+
+@media (max-width: 576px) {
+  .checkout-review-container {
+    padding: 0 0.75rem;
+  }
+
+  .checkout-steps {
+    flex-wrap: wrap;
+  }
+
+  .checkout-steps .step-line {
+    display: none;
+  }
+}
+</style>
+
+<script>
+(function() {
+  const applyBtn = document.getElementById('apply-discount-btn');
+  if (!applyBtn) {
+    return;
+  }
+
+  const summary = document.getElementById('checkout-summary');
+  const codeInput = document.getElementById('discount-code-input');
+  const discountDisplay = document.getElementById('discount-amount-display');
+  const totalDisplay = document.getElementById('total-amount');
+  const subtotalDisplay = document.getElementById('subtotal-amount');
+  const shippingDisplay = document.getElementById('shipping-cost-amount');
+  const summaryMeta = document.getElementById('discount-summary');
+  const codeDisplay = document.getElementById('discount-code-display');
+  const typeDisplay = document.getElementById('discount-type-display');
+  const applyUrl = summary ? summary.dataset.applyUrl : null;
+  const cancelBtn = document.getElementById('cancel-discount-btn');
+  const cancelUrl = summary ? summary.dataset.cancelUrl : null;
+
+  function getCsrfToken() {
+    return getCookie('csrftoken') || '';
+  }
+
+  function showToastMessage(message, type = 'success') {
+    if (!message) {
+      return;
+    }
+    if (typeof window.showToast === 'function') {
+      window.showToast(message, type);
+    }
+  }
+
+  function formatDiscountLabel(text) {
+    if (!discountDisplay) {
+      return;
+    }
+    if (!text || text === 'Rp 0') {
+      discountDisplay.textContent = 'Rp 0';
+    } else {
+      discountDisplay.textContent = text.startsWith('-') ? text : `-${text}`;
+    }
+  }
+
+  function toggleDiscountButtons(hasDiscount) {
+    if (applyBtn) {
+      applyBtn.classList.toggle('d-none', hasDiscount);
+      applyBtn.disabled = false;
+    }
+    if (cancelBtn) {
+      cancelBtn.classList.toggle('d-none', !hasDiscount);
+      cancelBtn.disabled = false;
+    }
+  }
+
+  function updateSummaryMeta(hasDiscount, code = '', typeLabel = '') {
+    if (summaryMeta) {
+      summaryMeta.classList.toggle('d-none', !hasDiscount);
+    }
+    if (codeDisplay) {
+      codeDisplay.textContent = hasDiscount ? code : '';
+    }
+    if (typeDisplay) {
+      typeDisplay.textContent = hasDiscount ? typeLabel : '';
+    }
+  }
+
+  function applyDiscount() {
+    const code = codeInput.value.trim();
+    if (!code) {
+      showToastMessage('Silakan masukkan kode diskon.', 'error');
+      return;
+    }
+
+    if (!applyUrl) {
+      showToastMessage('Tidak dapat memproses kode diskon saat ini.', 'error');
+      return;
+    }
+
+    applyBtn.disabled = true;
+
+    fetch(applyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': getCsrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: new URLSearchParams({ code }),
+    })
+      .then((response) => response.json().then((data) => ({ status: response.status, data })))
+      .then(({ status, data }) => {
+        if (!data) {
+          throw new Error('Terjadi kesalahan saat memproses respon.');
+        }
+
+        if (status >= 200 && status < 300 && data.success) {
+          formatDiscountLabel(data.discount_display);
+          if (totalDisplay && data.total_display) {
+            totalDisplay.textContent = data.total_display;
+          }
+          if (subtotalDisplay && data.subtotal_display) {
+            subtotalDisplay.textContent = data.subtotal_display;
+          }
+          if (shippingDisplay && data.shipping_cost_display) {
+            shippingDisplay.textContent = data.shipping_cost_display;
+          }
+          codeInput.value = data.code || code;
+          toggleDiscountButtons(true);
+          updateSummaryMeta(true, data.code || code, data.discount_type_label || '');
+          showToastMessage(data.message || 'Kupon berhasil diterapkan.', 'success');
+        } else {
+          if (data.discount_display) {
+            formatDiscountLabel(data.discount_display);
+          }
+          if (data.total_display) {
+            totalDisplay.textContent = data.total_display;
+          }
+          const isActive = typeof data.discount_active !== 'undefined' ? Boolean(data.discount_active) : false;
+          toggleDiscountButtons(isActive);
+          updateSummaryMeta(isActive, data.code || code, data.discount_type_label || '');
+          showToastMessage(data.error || 'Kupon tidak dapat digunakan.', 'error');
+        }
+      })
+      .catch(() => {
+        showToastMessage('Terjadi kesalahan. Silakan coba lagi.', 'error');
+      })
+      .finally(() => {
+        applyBtn.disabled = false;
+      });
+  }
+
+  applyBtn.addEventListener('click', applyDiscount);
+  codeInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      applyDiscount();
+    }
+  });
+
+  function cancelDiscount() {
+    if (!cancelBtn) {
+      return;
+    }
+    if (!cancelUrl) {
+      showToastMessage('Tidak dapat membatalkan diskon saat ini.', 'error');
+      return;
+    }
+
+    cancelBtn.disabled = true;
+
+    fetch(cancelUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': getCsrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: new URLSearchParams(),
+    })
+      .then((response) => response.json().then((data) => ({ status: response.status, data })))
+      .then(({ status, data }) => {
+        if (!data) {
+          throw new Error('Respon tidak valid.');
+        }
+
+        if (status >= 200 && status < 300 && data.success) {
+          formatDiscountLabel(data.discount_display || 'Rp 0');
+          if (totalDisplay && data.total_display) {
+            totalDisplay.textContent = data.total_display;
+          }
+          if (subtotalDisplay && data.subtotal_display) {
+            subtotalDisplay.textContent = data.subtotal_display;
+          }
+          if (shippingDisplay && data.shipping_cost_display) {
+            shippingDisplay.textContent = data.shipping_cost_display;
+          }
+          codeInput.value = '';
+          toggleDiscountButtons(false);
+          updateSummaryMeta(false);
+          showToastMessage('Kupon dibatalkan.', 'success');
+        } else {
+          if (data.discount_display) {
+            formatDiscountLabel(data.discount_display);
+          }
+          if (data.total_display) {
+            totalDisplay.textContent = data.total_display;
+          }
+          const isActive = typeof data.discount_active !== 'undefined' ? Boolean(data.discount_active) : false;
+          toggleDiscountButtons(isActive);
+          updateSummaryMeta(isActive, data.code || '', data.discount_type_label || '');
+          showToastMessage(data.error || 'Tidak dapat membatalkan kupon.', 'error');
+        }
+      })
+      .catch(() => {
+        showToastMessage('Terjadi kesalahan saat membatalkan kupon.', 'error');
+      })
+      .finally(() => {
+        cancelBtn.disabled = false;
+      });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', cancelDiscount);
+  }
+})();
+</script>
+{% endblock %}
+
+{% block extra_js %}
+{% if is_midtrans_payment %}
+<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ MIDTRANS_CLIENT_KEY }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const checkoutBtn = document.getElementById('btn-checkout');
+    const summaryData = document.getElementById('checkout-summary-data');
+    const createTokenUrl = '{{ payment_create_snap_token_url }}';
+    const finishUrl = '{{ payment_finish_url }}';
+    const orderCompleteUrl = '{{ order_complete_url }}';
+    const midtransSlug = '{{ midtrans_payment_slug|lower }}';
+
+    if (!checkoutBtn) {
+      return;
+    }
+
+    const selectedPaymentSlug = (checkoutBtn.dataset.paymentMethod || '').toLowerCase();
+    if (selectedPaymentSlug !== midtransSlug) {
+      return;
+    }
+
+    function showNotification(message, type = 'success') {
+      if (!message) {
+        return;
+      }
+      if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+      } else {
+        alert(message);
+      }
+    }
+
+    function toggleLoading(state) {
+      if (!checkoutBtn) {
+        return;
+      }
+      if (state) {
+        checkoutBtn.dataset.originalText = checkoutBtn.textContent;
+        checkoutBtn.textContent = 'Memproses...';
+        checkoutBtn.disabled = true;
+      } else {
+        const originalText = checkoutBtn.dataset.originalText;
+        if (originalText) {
+          checkoutBtn.textContent = originalText;
+        }
+        checkoutBtn.disabled = false;
+      }
+    }
+
+    function postFinish(status, result) {
+      return fetch(finishUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken') || ''
+        },
+        body: JSON.stringify({ status, result })
+      }).catch((error) => {
+        console.warn('Gagal mengirim status pembayaran', error);
+      });
+    }
+
+    async function handleCheckoutClick() {
+      if (!window.snap) {
+        showNotification('Midtrans Snap belum siap. Muat ulang halaman dan coba lagi.', 'error');
+        return;
+      }
+
+      toggleLoading(true);
+
+      const payload = summaryData
+        ? {
+            subtotal: summaryData.dataset.subtotal,
+            shipping_cost: summaryData.dataset.shippingCost,
+            discount: summaryData.dataset.discount,
+            total: summaryData.dataset.total
+          }
+        : {};
+
+      try {
+        const response = await fetch(createTokenUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') || ''
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error('Gagal membuat Snap Token');
+        }
+
+        const data = await response.json();
+        const token = data && data.token;
+
+        if (!token) {
+          throw new Error('Token Snap tidak ditemukan');
+        }
+
+        toggleLoading(false);
+
+        window.snap.pay(token, {
+          onSuccess: function (result) {
+            showNotification('Pembayaran berhasil.', 'success');
+            postFinish('success', result).finally(function () {
+              window.location.href = orderCompleteUrl;
+            });
+          },
+          onPending: function (result) {
+            showNotification('Pembayaran dalam proses. Silakan selesaikan pembayaran Anda.', 'warning');
+            postFinish('pending', result);
+          },
+          onError: function (result) {
+            showNotification('Terjadi kesalahan dalam pembayaran.', 'error');
+            postFinish('error', result);
+          },
+          onClose: function () {
+            showNotification('Anda menutup pop-up pembayaran sebelum selesai.', 'warning');
+          }
+        });
+      } catch (error) {
+        console.error(error);
+        showNotification(error.message || 'Gagal membuat Snap Token', 'error');
+        toggleLoading(false);
+      }
+    }
+
+    checkoutBtn.addEventListener('click', handleCheckoutClick);
+  });
+</script>
+{% elif is_doku_payment %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const checkoutBtn = document.getElementById('btn-checkout');
+    const summaryData = document.getElementById('checkout-summary-data');
+    const createCheckoutUrl = '{{ payment_create_doku_checkout_url }}';
+    const dokuSlug = '{{ doku_payment_slug|lower }}';
+
+    if (!checkoutBtn) {
+      return;
+    }
+
+    const selectedPaymentSlug = (checkoutBtn.dataset.paymentMethod || '').toLowerCase();
+    if (selectedPaymentSlug !== dokuSlug) {
+      return;
+    }
+
+    function showNotification(message, type = 'success') {
+      if (!message) {
+        return;
+      }
+      if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+      } else {
+        alert(message);
+      }
+    }
+
+    function toggleLoading(state) {
+      if (!checkoutBtn) {
+        return;
+      }
+      if (state) {
+        checkoutBtn.dataset.originalText = checkoutBtn.textContent;
+        checkoutBtn.textContent = 'Memproses...';
+        checkoutBtn.disabled = true;
+      } else {
+        const originalText = checkoutBtn.dataset.originalText;
+        if (originalText) {
+          checkoutBtn.textContent = originalText;
+        }
+        checkoutBtn.disabled = false;
+      }
+    }
+
+    checkoutBtn.addEventListener('click', async function handleDokuCheckout() {
+      toggleLoading(true);
+
+      const payload = summaryData
+        ? {
+            subtotal: summaryData.dataset.subtotal,
+            shipping_cost: summaryData.dataset.shippingCost,
+            discount: summaryData.dataset.discount,
+            total: summaryData.dataset.total
+          }
+        : {};
+
+      try {
+        const response = await fetch(createCheckoutUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') || ''
+          },
+          body: JSON.stringify(payload)
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = null;
+        }
+
+        if (!response.ok) {
+          const message = data && (data.message || data.error);
+          throw new Error(message || 'Gagal membuat sesi pembayaran DOKU');
+        }
+
+        const paymentUrl = data && (data.payment_url || data.redirect_url || data.checkout_url);
+
+        if (!paymentUrl) {
+          throw new Error('URL pembayaran DOKU tidak ditemukan');
+        }
+
+        window.location.href = paymentUrl;
+      } catch (error) {
+        console.error(error);
+        showNotification(error.message || 'Gagal membuat sesi pembayaran DOKU', 'error');
+        toggleLoading(false);
+      }
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

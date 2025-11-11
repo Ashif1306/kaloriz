@@ -1,0 +1,187 @@
+{% extends 'core/profile_layout.html' %}
+
+{% block title %}Pengaturan Profil - Kaloriz{% endblock %}
+
+{% block profile_content %}
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Pengaturan Akun</h2>
+      <p>Kelola foto profil dan informasi dasar akun Anda.</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="profile-form">
+    {% csrf_token %}
+
+    <div class="profile-photo-editor">
+      <div class="profile-photo-frame">
+        {% if profile.photo %}
+          <img src="{{ profile.photo.url }}" alt="Foto profil" id="photo-preview" class="profile-photo-img">
+        {% else %}
+          <div id="photo-preview" class="profile-photo-placeholder">
+            <i class="fas fa-user"></i>
+          </div>
+        {% endif %}
+      </div>
+      <div class="profile-photo-actions">
+        <label for="photo" class="btn btn-primary">
+          <i class="fas fa-camera"></i> Pilih Foto
+        </label>
+        <input type="file" id="photo" name="photo" accept="image/*" hidden onchange="previewPhoto(this)">
+        <input type="hidden" name="remove_photo" id="remove_photo" value="0">
+        {% if profile.photo %}
+        <button type="button" class="btn btn-outline-secondary" onclick="removePhoto()">
+          <i class="fas fa-trash"></i> Hapus Foto
+        </button>
+        {% endif %}
+        <small class="text-muted d-block mt-2">Format: JPG, PNG. Maksimal 5MB</small>
+      </div>
+    </div>
+
+    <hr class="my-4">
+    <h5 class="font-weight-bold text-primary mb-3">Informasi Akun</h5>
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        <label for="first_name">Nama Depan</label>
+        <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user.first_name }}">
+      </div>
+      <div class="form-group col-md-6">
+        <label for="last_name">Nama Belakang</label>
+        <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user.last_name }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}">
+    </div>
+
+    <hr class="my-4">
+    <h5 class="font-weight-bold text-primary mb-3">Informasi Pribadi</h5>
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        <label for="phone">Nomor Telepon</label>
+        <input type="tel" class="form-control" id="phone" name="phone" value="{{ profile.phone }}">
+      </div>
+      <div class="form-group col-md-6">
+        <label for="gender">Jenis Kelamin</label>
+        <select class="form-control" id="gender" name="gender">
+          <option value="">-- Pilih --</option>
+          <option value="M" {% if profile.gender == 'M' %}selected{% endif %}>Laki-laki</option>
+          <option value="F" {% if profile.gender == 'F' %}selected{% endif %}>Perempuan</option>
+          <option value="O" {% if profile.gender == 'O' %}selected{% endif %}>Lainnya</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="birth_date">Tanggal Lahir</label>
+      <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ profile.birth_date|date:'Y-m-d' }}">
+    </div>
+
+    <hr class="my-4">
+    <h5 class="font-weight-bold text-primary mb-3">Alamat</h5>
+    <div class="form-group">
+      <label for="address">Alamat Lengkap</label>
+      <textarea class="form-control" id="address" name="address" rows="3">{{ profile.address }}</textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        <label for="city">Kota</label>
+        <input type="text" class="form-control" id="city" name="city" value="{{ profile.city }}">
+      </div>
+      <div class="form-group col-md-6">
+        <label for="postal_code">Kode Pos</label>
+        <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ profile.postal_code }}">
+      </div>
+    </div>
+
+    <div class="profile-form-actions">
+      <button type="submit" class="btn btn-primary mr-2">
+        <i class="fas fa-save"></i> Simpan Perubahan
+      </button>
+      <a href="{% url 'core:profile' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-times"></i> Batalkan
+      </a>
+    </div>
+  </form>
+</div>
+
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Ubah Password</h2>
+      <p>Lindungi akun Anda dengan password yang kuat.</p>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'core:change_password' %}" class="profile-form">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="old_password">Password Lama</label>
+      <input type="password" class="form-control" id="old_password" name="old_password" required>
+    </div>
+    <div class="form-row">
+      <div class="form-group col-md-6">
+        <label for="new_password1">Password Baru</label>
+        <input type="password" class="form-control" id="new_password1" name="new_password1" required>
+        <small class="text-muted">Minimal 8 karakter</small>
+      </div>
+      <div class="form-group col-md-6">
+        <label for="new_password2">Konfirmasi Password Baru</label>
+        <input type="password" class="form-control" id="new_password2" name="new_password2" required>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">
+      <i class="fas fa-key"></i> Ubah Password
+    </button>
+  </form>
+</div>
+
+<script>
+  function createPlaceholder() {
+    const placeholder = document.createElement('div');
+    placeholder.id = 'photo-preview';
+    placeholder.className = 'profile-photo-placeholder';
+    placeholder.innerHTML = '<i class="fas fa-user"></i>';
+    return placeholder;
+  }
+
+  function previewPhoto(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const container = document.querySelector('.profile-photo-frame');
+        let preview = document.getElementById('photo-preview');
+        if (preview && preview.tagName.toLowerCase() === 'img') {
+          preview.src = e.target.result;
+        } else {
+          if (preview) {
+            container.removeChild(preview);
+          }
+          const img = document.createElement('img');
+          img.id = 'photo-preview';
+          img.src = e.target.result;
+          img.alt = 'Foto profil';
+          img.className = 'profile-photo-img';
+          container.appendChild(img);
+        }
+      };
+      reader.readAsDataURL(input.files[0]);
+      document.getElementById('remove_photo').value = '0';
+    }
+  }
+
+  function removePhoto() {
+    const container = document.querySelector('.profile-photo-frame');
+    const preview = document.getElementById('photo-preview');
+    if (preview) {
+      container.replaceChild(createPlaceholder(), preview);
+    }
+    const fileInput = document.getElementById('photo');
+    if (fileInput) {
+      fileInput.value = '';
+    }
+    document.getElementById('remove_photo').value = '1';
+  }
+</script>
+{% endblock %}

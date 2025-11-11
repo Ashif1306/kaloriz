@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #28a745; color: white; padding: 30px; text-align: center; }
+        .content { background: #f8f9fa; padding: 30px; }
+        .welcome-icon { font-size: 64px; margin-bottom: 20px; }
+        .button { display: inline-block; background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="welcome-icon">🎉</div>
+            <h1>Selamat Datang di Kaloriz!</h1>
+        </div>
+        <div class="content">
+            <h2>Halo, {{ user.first_name }}!</h2>
+            <p>Terima kasih telah mendaftar di <strong>Kaloriz</strong>, marketplace terpercaya untuk produk kesehatan dan kebugaran.</p>
+
+            <p>Akun Anda telah berhasil dibuat dengan email: <strong>{{ user.email }}</strong></p>
+
+            <h3>Apa Selanjutnya?</h3>
+            <ul>
+                <li>Jelajahi ribuan produk kesehatan berkualitas</li>
+                <li>Tambahkan produk favorit ke watchlist Anda</li>
+                <li>Nikmati promo dan diskon eksklusif</li>
+                <li>Lacak pesanan Anda dengan mudah</li>
+            </ul>
+
+            <div style="text-align: center;">
+                <p>Mulai berbelanja sekarang!</p>
+            </div>
+
+            <p>Jika Anda memiliki pertanyaan, jangan ragu untuk menghubungi tim support kami.</p>
+
+            <p>Salam hangat,<br><strong>Tim Kaloriz</strong></p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 Kaloriz. All rights reserved.</p>
+            <p>Email ini dikirim otomatis, mohon tidak membalas email ini.</p>
+        </div>
+    </div>
+</body>
+</html>

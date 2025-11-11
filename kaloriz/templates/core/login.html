@@ -1,0 +1,553 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login - Kaloriz{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --header-h: 0px;
+    --primary-color: #38b6ff;
+    --primary-dark: #2196F3;
+  }
+
+  /* Reset body margin/padding */
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Auth Page Styles */
+  .auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #38b6ff 0%, #2196F3 100%);
+    padding: 20px;
+    position: relative;
+  }
+
+  .auth-card {
+    background: white;
+    border-radius: 30px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+    display: flex;
+    max-width: 1200px;
+    width: 100%;
+    overflow: hidden;
+    min-height: 650px;
+    position: relative;
+  }
+
+  /* Left side - Form */
+  .auth-content {
+    flex: 1;
+    padding: 80px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-width: 500px;
+  }
+
+  .auth-title {
+    font-size: 48px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 50px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Form Styles */
+  .auth-form {
+    width: 100%;
+  }
+
+  .auth-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+
+  .auth-message--error {
+    background: #FEE;
+    color: #D32F2F;
+    border: 1px solid #FFCDD2;
+  }
+
+  .auth-field {
+    margin-bottom: 25px;
+  }
+
+  .auth-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+  }
+
+  .auth-input {
+    width: 100%;
+    padding: 16px 18px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 15px;
+    transition: all 0.3s ease;
+    background: #f8f9fa;
+    font-family: inherit;
+  }
+
+  .auth-input:focus {
+    outline: none;
+    border-color: #38b6ff;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(56, 182, 255, 0.1);
+  }
+
+  .auth-input::placeholder {
+    color: #aaa;
+  }
+
+  /* Password field with eye icon */
+  .auth-password-wrapper {
+    position: relative;
+  }
+
+  .auth-password-toggle {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #999;
+    font-size: 18px;
+    transition: color 0.3s ease;
+  }
+
+  .auth-password-toggle:hover {
+    color: #666;
+  }
+
+  .auth-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 30px 0;
+  }
+
+  .auth-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .auth-remember input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #38b6ff;
+  }
+
+  .auth-link {
+    color: #38b6ff;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: opacity 0.3s ease;
+  }
+
+  .auth-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+  }
+
+  .auth-submit {
+    width: 100%;
+    padding: 18px;
+    background: #38b6ff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+  }
+
+  .auth-submit:hover {
+    background: #2196F3;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(56, 182, 255, 0.35);
+  }
+
+  .auth-submit:active {
+    transform: translateY(0);
+  }
+
+  .auth-meta {
+    text-align: center;
+    margin-top: 35px;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .auth-meta a {
+    color: #38b6ff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .auth-meta a:hover {
+    text-decoration: underline;
+  }
+
+  /* Right side - Visual */
+  .auth-visual {
+    flex: 1;
+    background: linear-gradient(135deg, #e8f4ff 0%, #d6e8ff 100%);
+    padding: 80px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-illustration {
+    width: 100%;
+    max-width: 450px;
+    margin-bottom: 50px;
+    position: relative;
+    height: 350px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-visual-content {
+    text-align: center;
+    max-width: 450px;
+    z-index: 1;
+  }
+
+  .auth-visual-content h3 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 20px 0;
+    line-height: 1.2;
+  }
+
+  .auth-description {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 40px;
+  }
+
+  /* Progress dots */
+  .auth-progress {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 50px;
+  }
+
+  .auth-progress-dot {
+    width: 45px;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+  }
+
+  .auth-progress-dot.active {
+    background: #38b6ff;
+    box-shadow: 0 2px 8px rgba(56, 182, 255, 0.4);
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .auth-card {
+      flex-direction: column;
+      max-width: 500px;
+      min-height: auto;
+    }
+    
+    .auth-content {
+      padding: 60px 40px 40px;
+      max-width: none;
+    }
+
+    .auth-visual {
+      padding: 40px;
+      min-height: 400px;
+    }
+
+    .auth-title {
+      font-size: 36px;
+    }
+
+    .auth-illustration {
+      height: 250px;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .auth-card {
+      border-radius: 20px;
+      margin: 10px;
+    }
+
+    .auth-content {
+      padding: 40px 25px 30px;
+    }
+    
+    .auth-title {
+      font-size: 32px;
+      margin-bottom: 35px;
+    }
+
+    .auth-visual {
+      padding: 30px 25px;
+    }
+
+    .auth-visual-content h3 {
+      font-size: 24px;
+    }
+
+    .auth-description {
+      font-size: 14px;
+    }
+
+    .auth-progress-dot {
+      width: 35px;
+    }
+  }
+
+  /* Animation for floating elements */
+  @keyframes float {
+    0% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-15px) scale(1.05); }
+    100% { transform: translateY(0px) scale(1); }
+  }
+
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .float-animation {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .rotate-animation {
+    animation: rotate 20s linear infinite;
+  }
+</style>
+{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-page auth-page--login">
+  <div class="auth-card">
+    <div class="auth-content">
+      <h1 class="auth-title">Login</h1>
+
+      <form method="post" class="auth-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="auth-message auth-message--error">
+            {{ form.non_field_errors|join:' ' }}
+          </div>
+        {% endif %}
+
+        <div class="auth-field">
+          <label for="username" class="auth-label">Username or email</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            class="auth-input"
+            value="{{ entered_username }}"
+            placeholder="Enter your username or email"
+            required
+            autofocus>
+        </div>
+
+        <div class="auth-field">
+          <label for="password" class="auth-label">Password</label>
+          <div class="auth-password-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="auth-input"
+              placeholder="Enter your password"
+              required>
+            <span class="auth-password-toggle" onclick="togglePassword()">
+              <i class="far fa-eye" id="toggleIcon"></i>
+            </span>
+          </div>
+        </div>
+
+        <div class="auth-action">
+          <label class="auth-remember" for="remember_me">
+            <input type="checkbox" id="remember_me" name="remember_me" {% if remember_me %}checked{% endif %}>
+            <span>Remember me</span>
+          </label>
+          <a href="mailto:info@kaloriz.com?subject=Forgot%20Password" class="auth-link">Forgot password ?</a>
+        </div>
+
+        <button type="submit" class="auth-submit">Login</button>
+      </form>
+
+      <p class="auth-meta">Don't have an account ? <a href="{% url 'core:register' %}">Sing up</a></p>
+    </div>
+
+    <div class="auth-visual">
+      <div class="auth-illustration">
+        <!-- Complex SVG Illustration matching the original design -->
+        <svg viewBox="0 0 500 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background circular gradient -->
+          <defs>
+            <radialGradient id="bgGradient" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" style="stop-color:#e3f2fd;stop-opacity:0.3" />
+              <stop offset="100%" style="stop-color:#bbdefb;stop-opacity:0.1" />
+            </radialGradient>
+          </defs>
+          
+          <circle cx="250" cy="200" r="180" fill="url(#bgGradient)" />
+          
+          <!-- Central platform -->
+          <g transform="translate(250, 200)">
+            <!-- Main platform -->
+            <ellipse cx="0" cy="0" rx="120" ry="80" fill="#f5f5f5" opacity="0.6"/>
+            <ellipse cx="0" cy="-5" rx="110" ry="70" fill="#ffffff" stroke="#e0e0e0" stroke-width="2"/>
+            
+            <!-- Central email/message box -->
+            <g class="float-animation">
+              <rect x="-50" y="-40" width="100" height="70" rx="8" fill="#38b6ff" />
+              <path d="M-45 -35 L0 -5 L45 -35" stroke="white" stroke-width="3" fill="none"/>
+              <rect x="-40" y="-30" width="80" height="50" rx="4" fill="#2196F3" opacity="0.8"/>
+            </g>
+          </g>
+          
+          <!-- Person figure 1 (left bottom) -->
+          <g transform="translate(120, 280)">
+            <circle cx="0" cy="-20" r="18" fill="#FF6B6B"/>
+            <rect x="-12" y="0" width="24" height="35" rx="4" fill="#4ECDC4"/>
+            <rect x="-8" y="35" width="6" height="20" fill="#4ECDC4"/>
+            <rect x="2" y="35" width="6" height="20" fill="#4ECDC4"/>
+            <!-- Arms -->
+            <rect x="-20" y="5" width="8" height="20" rx="4" fill="#4ECDC4" transform="rotate(-30 -16 15)"/>
+            <rect x="12" y="5" width="8" height="20" rx="4" fill="#4ECDC4" transform="rotate(30 16 15)"/>
+          </g>
+          
+          <!-- Person figure 2 (right top) -->
+          <g transform="translate(380, 140)" class="float-animation" style="animation-delay: 1s;">
+            <circle cx="0" cy="-20" r="18" fill="#FFD93D"/>
+            <rect x="-12" y="0" width="24" height="35" rx="4" fill="#6BCF7F"/>
+            <rect x="-8" y="35" width="6" height="20" fill="#6BCF7F"/>
+            <rect x="2" y="35" width="6" height="20" fill="#6BCF7F"/>
+          </g>
+
+          <!-- Person figure 3 (right bottom) -->
+          <g transform="translate(370, 280)">
+            <circle cx="0" cy="-20" r="18" fill="#E91E63"/>
+            <rect x="-12" y="0" width="24" height="35" rx="4" fill="#FF6B6B"/>
+            <rect x="-8" y="35" width="6" height="20" fill="#FF6B6B"/>
+            <rect x="2" y="35" width="6" height="20" fill="#FF6B6B"/>
+          </g>
+          
+          <!-- Floating UI elements -->
+          <!-- @ symbol bubble -->
+          <g transform="translate(150, 80)" class="float-animation" style="animation-delay: 0.5s;">
+            <circle cx="0" cy="0" r="30" fill="#4ECDC4" opacity="0.9"/>
+            <text x="0" y="8" text-anchor="middle" fill="white" font-size="24" font-weight="bold">@</text>
+          </g>
+          
+          <!-- User avatar bubble -->
+          <g transform="translate(350, 80)" class="float-animation" style="animation-delay: 2s;">
+            <circle cx="0" cy="0" r="30" fill="#FF6B6B" opacity="0.9"/>
+            <circle cx="0" cy="-5" r="10" fill="white"/>
+            <path d="M-15 15 Q0 5 15 15" fill="white"/>
+          </g>
+          
+          <!-- Lock icon -->
+          <g transform="translate(400, 200)" class="rotate-animation">
+            <rect x="-20" y="0" width="40" height="30" rx="6" fill="none" stroke="#FFD93D" stroke-width="4"/>
+            <path d="M-12 0 L-12 -12 Q0 -24 12 -12 L12 0" fill="none" stroke="#FFD93D" stroke-width="4"/>
+            <circle cx="0" cy="15" r="5" fill="#FFD93D"/>
+          </g>
+          
+          <!-- Chart/Analytics widget -->
+          <g transform="translate(100, 160)" class="float-animation" style="animation-delay: 1.5s;">
+            <rect width="80" height="60" rx="8" fill="white" stroke="#e0e0e0" stroke-width="2"/>
+            <rect x="10" y="40" width="10" height="12" fill="#38b6ff"/>
+            <rect x="25" y="30" width="10" height="22" fill="#2196F3"/>
+            <rect x="40" y="25" width="10" height="27" fill="#38b6ff"/>
+            <rect x="55" y="35" width="10" height="17" fill="#2196F3"/>
+          </g>
+          
+          <!-- Chat bubble -->
+          <g transform="translate(320, 250)">
+            <rect width="70" height="40" rx="20" fill="#6BCF7F" opacity="0.9"/>
+            <path d="M20 35 L20 50 L35 35" fill="#6BCF7F" opacity="0.9"/>
+            <circle cx="20" cy="20" r="3" fill="white"/>
+            <circle cx="35" cy="20" r="3" fill="white"/>
+            <circle cx="50" cy="20" r="3" fill="white"/>
+          </g>
+          
+          <!-- Pie chart widget -->
+          <g transform="translate(180, 250)" class="rotate-animation" style="animation-duration: 30s;">
+            <circle r="25" fill="#FFD93D" opacity="0.9"/>
+            <path d="M0 0 L25 0 A25 25 0 0 1 -12.5 21.65 Z" fill="#FF6B6B" opacity="0.9"/>
+          </g>
+        </svg>
+      </div>
+      
+      <div class="auth-visual-content">
+        <h3>“Mulai Hari Sehatmu Bersama Kaloriz”</h3>
+        <p class="auth-description">
+          Login untuk menjelajahi berbagai makanan dan minuman sehat yang siap menunjang gaya hidupmu
+        </p>
+      </div>
+
+      <div class="auth-progress">
+        <div class="auth-progress-dot active"></div>
+        <div class="auth-progress-dot"></div>
+        <div class="auth-progress-dot"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePassword() {
+  const passwordInput = document.getElementById('password');
+  const toggleIcon = document.getElementById('toggleIcon');
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleIcon.classList.remove('fa-eye');
+    toggleIcon.classList.add('fa-eye-slash');
+  } else {
+    passwordInput.type = 'password';
+    toggleIcon.classList.remove('fa-eye-slash');
+    toggleIcon.classList.add('fa-eye');
+  }
+}
+</script>
+{% endblock %}

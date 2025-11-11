@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verifikasi Email - Kaloriz{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --header-h: 0px;
+  }
+</style>
+{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-content">
+      <div>
+        <span class="auth-highlight"><i class="fas fa-envelope-circle-check"></i> Satu Langkah Lagi</span>
+        <h2>Verifikasi Email Anda</h2>
+        <p>Kami telah mengirimkan kode 6 digit ke <strong>{{ masked_email }}</strong>. Masukkan kode tersebut untuk mengaktifkan akun dan mulai berbelanja.</p>
+      </div>
+
+      <form method="post" class="auth-form">
+        {% csrf_token %}
+        <div>
+          <label for="code" class="auth-label">Kode Verifikasi</label>
+          <input
+            type="text"
+            id="code"
+            name="code"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            class="auth-input verification-input"
+            placeholder="000000"
+            required
+            autofocus>
+          <small class="verification-help d-block mt-2">Kode berlaku selama 10 menit. Mohon periksa folder spam jika tidak menemukan email.</small>
+        </div>
+
+        <button type="submit" class="auth-submit">Verifikasi &amp; Lanjutkan</button>
+      </form>
+
+      <div class="auth-message">
+        Tidak menerima kode? <a href="{% url 'core:resend_verification' %}" class="auth-link">Kirim ulang kode verifikasi</a>
+      </div>
+    </div>
+    <div class="auth-visual">
+      <div class="auth-visual-content">
+        <img src="{% static 'images/banner.jpg' %}" alt="Verifikasi email Kaloriz" loading="lazy">
+        <span class="auth-highlight"><i class="fas fa-shield-check"></i> Keamanan Terjamin</span>
+        <h3>Perlindungan untuk Akun Anda</h3>
+        <p class="auth-description">Verifikasi email membantu kami menjaga keamanan data pribadi dan memberikan rekomendasi produk yang relevan untuk Anda.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+{% block title %}Keranjang Belanja - Kaloriz{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4"><i class="fas fa-shopping-cart"></i> Keranjang Belanja</h2>
+
+  {% if cart.items.all %}
+  <div class="row g-4">
+    <!-- ====== TABEL KERANJANG ====== -->
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th width="36"><input type="checkbox" id="check-all" title="Pilih semua"></th>
+                  <th>Produk</th>
+                  <th width="120">Harga</th>
+                  <th width="160">Jumlah</th>
+                  <th width="140">Subtotal</th>
+                  <th width="64">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in cart.items.all %}
+                <tr class="cart-row {% if item.is_selected %}selected{% endif %}"
+                    data-item-id="{{ item.id }}"
+                    data-price="{{ item.product.get_display_price }}"> {# ANGKA DARI DB #}
+
+                  <td>
+                    <input type="checkbox" class="item-check" {% if item.is_selected %}checked{% endif %}>
+                  </td>
+
+                  <td>
+                  <div class="product-cell">
+                    {% if item.product.image %}
+                      <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}">
+                    {% endif %}
+                    <div class="product-info">
+                      <a href="{% url 'catalog:product_detail' item.product.slug %}">
+                        {{ item.product.name }}
+                      </a>
+                      <small class="text-muted">{{ item.product.category.name }}</small>
+                    </div>
+                  </div>
+                </td>
+
+                  <td class="price-cell">Rp {{ item.product.get_display_price|floatformat:0 }}</td>
+
+                  <td>
+                    <form method="post" action="{% url 'core:update_cart_item' item.id %}" class="qty-form d-flex">
+                      {% csrf_token %}
+                      <input type="number" name="quantity" class="form-control form-control-sm qty-input"
+                             min="1" max="{{ item.product.stock }}" value="{{ item.quantity }}">
+                      <button type="submit" class="btn btn-sm btn-primary ms-2" title="Simpan">
+                        <i class="fas fa-check"></i>
+                      </button>
+                    </form>
+                  </td>
+
+                  <td class="line-subtotal">
+                    <strong><span class="line-subtotal-text">Rp {{ item.get_subtotal|floatformat:0 }}</span></strong>
+                  </td>
+                  
+                  <td>
+                    <form method="post" action="{% url 'core:remove_from_cart' item.id %}" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus item ini?')" title="Hapus">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                  
+
+                </tr>
+
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <button type="button" id="btn-delete-selected" class="btn btn-outline-danger" disabled>
+              <i class="fas fa-trash-alt"></i> Hapus Dipilih
+            </button>
+            <form method="post" action="{% url 'core:clear_cart' %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('Kosongkan keranjang?')">
+                <i class="fas fa-trash"></i> Kosongkan Keranjang
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== RINGKASAN ====== -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm sticky-top" style="top:20px">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Ringkasan Belanja</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <span>Subtotal (<span id="selected-count">{{ cart.get_selected_items_count }}</span> item dipilih)</span>
+            <span id="selected-subtotal">Rp {{ cart.get_selected_total|floatformat:0 }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Ongkir</span>
+            <span class="text-muted"><small>Dihitung di checkout</small></span>
+          </div>
+          <hr>
+          <div class="d-flex justify-content-between mb-3">
+            <strong>Total Sementara</strong>
+            <strong class="text-primary" id="grand-total">Rp {{ cart.get_selected_total|floatformat:0 }}</strong>
+          </div>
+          <button type="button" id="btn-checkout" class="btn btn-primary w-100 btn-lg" {% if not cart.get_selected_items_count %}disabled{% endif %}>
+            <i class="fas fa-credit-card"></i> Checkout (<span id="checkout-count">{{ cart.get_selected_items_count }}</span>)
+          </button>
+          <a href="{% url 'catalog:product_list' %}" class="btn btn-outline-secondary w-100 mt-2">
+            <i class="fas fa-arrow-left"></i> Lanjut Belanja
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-center py-5">
+    <i class="fas fa-shopping-cart fa-5x text-muted mb-3"></i>
+    <h4>Keranjang Anda Kosong</h4>
+    <p class="text-muted">Mulai belanja sekarang!</p>
+    <a href="{% url 'catalog:product_list' %}" class="btn btn-primary">
+      <i class="fas fa-shopping-bag"></i> Belanja Sekarang
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  .cart-row.selected { background:#f8f9fa; transition:background .15s }
+  .item-check, #check-all { width:20px; height:20px; cursor:pointer }
+</style>
+<style>
+  .cart-row.selected { background:#f8f9fa; transition:background .15s; }
+  .item-check, #check-all { width:20px; height:20px; cursor:pointer; }
+
+  /* ========== RESPONSIVE PRODUCT CELL ========== */
+  .product-cell {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem; /* Jarak antara gambar dan teks */
+  }
+
+  .product-cell img {
+    width: 70px;
+    height: 70px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .product-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .product-info a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .product-info a:hover {
+    text-decoration: underline;
+  }
+
+  /* Responsif untuk tablet */
+  @media (max-width: 992px) {
+    .product-cell {
+      gap: 0.8rem;
+    }
+    .product-cell img {
+      width: 60px;
+      height: 60px;
+    }
+  }
+
+  /* Responsif untuk mobile */
+  @media (max-width: 576px) {
+    .table {
+      font-size: 14px;
+    }
+    .product-cell {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.5rem;
+    }
+    .product-cell img {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 0.3rem;
+    }
+    .product-info {
+      align-items: center;
+    }
+  }
+</style>
+
+<script>
+(function(){
+  const fmt = new Intl.NumberFormat('id-ID');
+  const rp  = n => 'Rp ' + fmt.format(Math.round(n||0));
+
+  const rows     = () => Array.from(document.querySelectorAll('.cart-row'));
+  const checkAll = document.getElementById('check-all');
+  const elCount  = document.getElementById('selected-count');
+  const elSub    = document.getElementById('selected-subtotal');
+  const elGrand  = document.getElementById('grand-total');
+  const btnCk    = document.getElementById('btn-checkout');
+  const elCkCnt  = document.getElementById('checkout-count');
+  const btnDel   = document.getElementById('btn-delete-selected');
+
+  function csrf(){
+    return getCookie('csrftoken') || '';
+  }
+
+  // Hitung subtotal per baris dari DB price x qty
+  function computeLine(tr){
+    const price = parseFloat(tr.dataset.price) || 0; // ANGKA dari DB (Decimal -> template)
+    const qtyEl = tr.querySelector('.qty-input');
+    const qty   = Math.max(1, parseInt(qtyEl.value, 10) || 1);
+    const line  = price * qty;
+    tr.querySelector('.line-subtotal-text').textContent = rp(line);
+    return { qty, line };
+  }
+
+  function recompute(){
+    let cnt = 0, subtotal = 0;
+    rows().forEach(tr=>{
+      const { line } = computeLine(tr);
+      const checked = tr.querySelector('.item-check').checked;
+      tr.classList.toggle('selected', checked);
+      if (checked){ cnt += 1; subtotal += line; }
+    });
+    elCount.textContent = cnt;
+    elSub.textContent   = rp(subtotal);
+    elGrand.textContent = rp(subtotal);
+    elCkCnt.textContent = cnt;
+    btnCk.disabled  = cnt === 0;
+    btnDel.disabled = cnt === 0;
+
+    if (checkAll){
+      const checks = rows().map(tr=>tr.querySelector('.item-check'));
+      const all  = checks.length && checks.every(ch=>ch.checked);
+      const some = checks.some(ch=>ch.checked);
+      checkAll.indeterminate = !all && some;
+      checkAll.checked = all;
+    }
+  }
+
+  // Qty berubah -> hitung ulang (opsional submit form untuk persist)
+  document.addEventListener('input', e=>{
+    if (!e.target.classList.contains('qty-input')) return;
+    if (+e.target.value < 1) e.target.value = 1;
+    recompute();
+  });
+
+  // Enter pada qty -> submit form update qty (server akan validasi stok)
+  document.addEventListener('keydown', e=>{
+    if (e.target.classList.contains('qty-input') && e.key === 'Enter'){
+      e.preventDefault();
+      e.target.closest('.qty-form').submit();
+    }
+  });
+
+  // Centang per-item / pilih semua
+  document.addEventListener('change', e=>{
+    if (e.target.classList.contains('item-check')){
+      const tr = e.target.closest('.cart-row');
+      fetch(`/cart/toggle-select/${tr.dataset.itemId}/`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},
+        body:JSON.stringify({is_selected:e.target.checked})
+      }).catch(()=>{});
+      recompute();
+    }
+    if (e.target.id === 'check-all'){
+      const on = e.target.checked;
+      rows().forEach(tr=>{
+        const ch = tr.querySelector('.item-check');
+        ch.checked = on;
+        fetch(`/cart/toggle-select/${tr.dataset.itemId}/`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},
+          body:JSON.stringify({is_selected:on})
+        }).catch(()=>{});
+      });
+      recompute();
+    }
+  });
+
+  // Hapus Dipilih
+  btnDel?.addEventListener('click', ()=>{
+    const ids = rows().filter(tr=>tr.querySelector('.item-check').checked)
+                      .map(tr=>tr.dataset.itemId);
+    if (!ids.length) return;
+    if (!confirm(`Hapus ${ids.length} item yang dipilih?`)) return;
+
+    fetch('/cart/delete-selected/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},
+      body:JSON.stringify({item_ids: ids})
+    }).then(r=>r.json()).then(res=>{
+      if (res.success) location.reload();
+      else alert(res.message || 'Gagal menghapus item');
+    }).catch(()=>alert('Terjadi kesalahan jaringan.'));
+  });
+
+  // Checkout
+  btnCk?.addEventListener('click', ()=>{
+    if (!btnCk.disabled) window.location.href = "{% url 'core:checkout' %}";
+  });
+
+  // Inisialisasi
+  recompute();
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'core/profile_layout.html' %}
+{% load price_filters %}
+
+{% block title %}Watchlist - Kaloriz{% endblock %}
+
+{% block profile_content %}
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Watchlist</h2>
+      <p>Daftar produk favorit Anda tersimpan rapi di sini.</p>
+    </div>
+    <a href="{% url 'catalog:product_list' %}" class="btn btn-primary">
+      <i class="fas fa-shopping-bag"></i> Cari Produk
+    </a>
+  </div>
+
+  {% if watchlist_items %}
+    <div class="profile-watchlist-grid">
+      {% for item in watchlist_items %}
+      <div class="watchlist-card">
+        <div class="watchlist-card-image">
+          {% if item.product.image %}
+            <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}">
+          {% else %}
+            <img src="https://via.placeholder.com/300x200?text={{ item.product.name }}" alt="{{ item.product.name }}">
+          {% endif %}
+          <form method="post" action="{% url 'core:remove_from_watchlist' item.id %}" class="watchlist-remove" onsubmit="return confirm('Hapus produk dari watchlist?');">
+            {% csrf_token %}
+            <button type="submit" class="btn-icon danger" title="Hapus dari watchlist">
+              <i class="fas fa-times"></i>
+            </button>
+          </form>
+        </div>
+        <div class="watchlist-card-body">
+          <h4>{{ item.product.name|truncatewords:8 }}</h4>
+          <p class="watchlist-price">Rp {{ item.product.get_display_price|dot_separator }}</p>
+          <div class="watchlist-meta">Ditambahkan: {{ item.added_at|date:"d M Y" }}</div>
+          <div class="watchlist-actions">
+            <a href="{% url 'catalog:product_detail' item.product.slug %}" class="btn btn-primary btn-sm">
+              <i class="fas fa-eye"></i> Lihat Produk
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="profile-empty">
+      <i class="fas fa-heart"></i>
+      <h4>Watchlist Anda kosong</h4>
+      <p>Tambahkan produk favorit untuk dilihat kembali nanti.</p>
+      <a href="{% url 'catalog:product_list' %}" class="btn btn-primary mt-3">
+        <i class="fas fa-search"></i> Jelajahi Produk
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+  {% block profile_extra_head %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+<div class="profile-wrapper">
+  <div class="container">
+    <div class="profile-container">
+      <aside class="profile-sidebar">
+        <div class="profile-card profile-user-card">
+          <div class="profile-avatar">
+            {% if profile.photo %}
+              <img src="{{ profile.photo.url }}" alt="{{ user.get_full_name|default:user.username }}">
+            {% else %}
+              <span class="avatar-initial">{{ user.get_full_name|default:user.username|first|default:'U' }}</span>
+            {% endif %}
+          </div>
+          <h3>{{ user.get_full_name|default:user.username }}</h3>
+          <p>@{{ user.username }}</p>
+          <div class="profile-meta">
+            <span><i class="fas fa-map-marker-alt text-primary mr-1"></i>{{ profile.city|default:'Lokasi belum diatur' }}</span>
+            <span><i class="fas fa-envelope text-primary mr-1"></i>{{ user.email|default:'Email belum diatur' }}</span>
+            <span><i class="fas fa-calendar-alt text-primary mr-1"></i>Bergabung {{ user.date_joined|date:'d M Y' }}</span>
+          </div>
+        </div>
+
+        <nav class="profile-menu">
+          <a href="{% url 'core:profile' %}" class="profile-menu-item {% if active_tab == 'profile' %}active{% endif %}">
+            <i class="fas fa-id-card"></i> Profil
+          </a>
+          <a href="{% url 'core:watchlist' %}" class="profile-menu-item {% if active_tab == 'watchlist' %}active{% endif %}">
+            <i class="fas fa-heart"></i> Watchlist
+          </a>
+          <a href="{% url 'core:order_list' %}" class="profile-menu-item {% if active_tab == 'orders' %}active{% endif %}">
+            <i class="fas fa-receipt"></i> Pesanan
+          </a>
+          <a href="{% url 'core:profile_settings' %}" class="profile-menu-item {% if active_tab == 'settings' %}active{% endif %}">
+            <i class="fas fa-sliders-h"></i> Pengaturan
+          </a>
+          <a href="{% url 'core:notifications' %}" class="profile-menu-item {% if active_tab == 'notifications' %}active{% endif %}">
+            <i class="fas fa-bell"></i> Notifikasi
+          </a>
+          <a href="{% url 'core:logout' %}" class="profile-menu-item">
+            <i class="fas fa-sign-out-alt"></i> Keluar
+          </a>
+        </nav>
+      </aside>
+
+      <section class="profile-main">
+        {% block profile_content %}{% endblock %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

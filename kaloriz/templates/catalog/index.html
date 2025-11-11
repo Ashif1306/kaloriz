@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Feane | Home{% endblock %}
+{% block body_class %}home-page{% endblock %}
+
+{% block content %}
+
+<!-- 🌅 HERO SECTION -->
+<div class="hero_area" id="home">
+  <div class="bg-box">
+    <img src="{% static 'images/hero-bg.jpg' %}" alt="">
+  </div>
+  <section class="slider_section">
+    <div id="customCarousel1" class="carousel slide" data-ride="carousel">
+      <div class="carousel-inner">
+        <div class="carousel-item active">
+          <div class="container">
+            <div class="row">
+              <div class="col-md-7 col-lg-6">
+                <div class="detail-box">
+                  <h1>Fast Food Restaurant</h1>
+                  <p>
+                    Enjoy tasty and fresh food with the best ingredients — served hot, every day!
+                  </p>
+                  <div class="btn-box">
+                    <a href="#menu" class="btn1">Order Now</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Slide lainnya jika mau ditambah -->
+      </div>
+      <div class="container">
+        <ol class="carousel-indicators">
+          <li data-target="#customCarousel1" data-slide-to="0" class="active"></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 🍔 MENU SECTION -->
+<section id="menu" class="food_section layout_padding-bottom">
+  <div class="container">
+    <div class="heading_container heading_center">
+      <h2>Our Menu</h2>
+    </div>
+
+    <ul class="filters_menu">
+      <li class="active" data-filter="*">All</li>
+      <li data-filter=".burger">Burger</li>
+      <li data-filter=".pizza">Pizza</li>
+      <li data-filter=".pasta">Pasta</li>
+      <li data-filter=".fries">Fries</li>
+    </ul>
+
+    <div class="filters-content">
+      <div class="row grid">
+        {% comment %} Nanti ini bisa diganti loop produk dari database {% endcomment %}
+        <div class="col-sm-6 col-lg-4 all pizza">
+          <div class="box">
+            <div class="img-box">
+              <img src="{% static 'images/f1.png' %}" alt="">
+            </div>
+            <div class="detail-box">
+              <h5>Delicious Pizza</h5>
+              <p>Cheesy, hot, and perfect for every occasion.</p>
+              <div class="options">
+                <h6>$10</h6>
+                <a href="#"><i class="fa fa-shopping-cart"></i></a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-4 all burger">
+          <div class="box">
+            <div class="img-box">
+              <img src="{% static 'images/f2.png' %}" alt="">
+            </div>
+            <div class="detail-box">
+              <h5>Tasty Burger</h5>
+              <p>Juicy grilled burger with lettuce and cheese.</p>
+              <div class="options">
+                <h6>$8</h6>
+                <a href="#"><i class="fa fa-shopping-cart"></i></a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-lg-4 all pasta">
+          <div class="box">
+            <div class="img-box">
+              <img src="{% static 'images/f4.png' %}" alt="">
+            </div>
+            <div class="detail-box">
+              <h5>Italian Pasta</h5>
+              <p>Fresh pasta with creamy sauce and herbs.</p>
+              <div class="options">
+                <h6>$9</h6>
+                <a href="#"><i class="fa fa-shopping-cart"></i></a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-box">
+      <a href="#book">View More</a>
+    </div>
+  </div>
+</section>
+
+<!-- 🧑‍🍳 ABOUT SECTION -->
+<section id="about" class="about_section layout_padding">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="img-box">
+          <img src="{% static 'images/about-img.png' %}" alt="">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="detail-box">
+          <div class="heading_container">
+            <h2>We Are Feane</h2>
+          </div>
+          <p>
+            Feane is a modern fast-food restaurant dedicated to quality, flavor, and fresh ingredients.
+            We bring the best taste with a friendly atmosphere, perfect for family and friends.
+          </p>
+          <a href="#menu">Discover Menu</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 📅 BOOK TABLE SECTION -->
+<section id="book" class="book_section layout_padding">
+  <div class="container">
+    <div class="heading_container">
+      <h2>Book A Table</h2>
+    </div>
+    <div class="row">
+      <div class="col-md-6">
+        <div class="form_container">
+          <form>
+            <div><input type="text" class="form-control" placeholder="Your Name" /></div>
+            <div><input type="text" class="form-control" placeholder="Phone Number" /></div>
+            <div><input type="email" class="form-control" placeholder="Your Email" /></div>
+            <div>
+              <select class="form-control nice-select wide">
+                <option disabled selected>How many persons?</option>
+                <option>2</option>
+                <option>3</option>
+                <option>4</option>
+                <option>5</option>
+              </select>
+            </div>
+            <div><input type="datetime-local" class="form-control" /></div>
+            <div class="btn_box"><button type="submit">Book Now</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="map_container">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!..."
+            width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy">
+          </iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

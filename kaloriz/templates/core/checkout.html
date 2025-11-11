@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}Checkout - Kaloriz{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <h2 class="mb-4"><i class="fas fa-credit-card"></i> Checkout</h2>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Informasi Pengiriman</h5>
+        </div>
+        <div class="card-body">
+          <form method="post" action="{% url 'core:place_order' %}" id="checkout-form">
+            {% csrf_token %}
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="full_name">Nama Lengkap *</label>
+                <input type="text" class="form-control" id="full_name" name="full_name"
+                       value="{% if default_address %}{{ default_address.full_name }}{% elif profile %}{{ user.get_full_name }}{% endif %}" required>
+              </div>
+              <div class="form-group col-md-6">
+                <label for="email">Email *</label>
+                <input type="email" class="form-control" id="email" name="email"
+                       value="{{ user.email }}" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="phone">Nomor Telepon *</label>
+              <input type="tel" class="form-control" id="phone" name="phone"
+                     value="{% if default_address %}{{ default_address.phone }}{% elif profile %}{{ profile.phone }}{% endif %}"
+                     placeholder="08xxxxxxxxxx" required>
+              <small class="form-text text-muted">Format: 08xxx, +62xxx, atau 62xxx</small>
+            </div>
+
+            <div class="form-group">
+              <label for="street">Alamat / Jalan *</label>
+              <textarea class="form-control" id="street" name="street" rows="3"
+                        placeholder="Alamat lengkap (nama jalan, nomor rumah, RT/RW, dll)" required>{% if default_address %}{{ default_address.street }}{% elif profile %}{{ profile.address }}{% endif %}</textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="district_id">Kecamatan *</label>
+                <select class="form-control" id="district_id" name="district_id" required>
+                  <option value="">Pilih Kecamatan...</option>
+                  {% for district in districts %}
+                  <option value="{{ district.id }}" {% if default_address and default_address.district.id == district.id %}selected{% endif %}>
+                    {{ district.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group col-md-6">
+                <label for="postal_code">Kode Pos *</label>
+                <input type="text" class="form-control" id="postal_code" name="postal_code"
+                       value="{% if default_address %}{{ default_address.postal_code }}{% elif profile %}{{ profile.postal_code }}{% endif %}"
+                       placeholder="90xxx" maxlength="5" required>
+                <small class="form-text text-muted">Kode pos Makassar dimulai dengan 90</small>
+              </div>
+            </div>
+
+            <!-- Shipping Service Selection -->
+            <div class="form-group" id="shipping-service-group" style="display: none;">
+              <label>Layanan Pengiriman *</label>
+              <div id="shipping-options">
+                <!-- Will be populated by AJAX -->
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="notes">Catatan (Opsional)</label>
+              <textarea class="form-control" id="notes" name="notes" rows="2"
+                        placeholder="Contoh: Rumah cat hijau, samping toko kelontong"></textarea>
+            </div>
+
+            <!-- Hidden fields for shipping data -->
+            <input type="hidden" name="shipping_service" id="shipping_service">
+
+            <button type="submit" class="btn btn-success btn-lg btn-block" id="submit-btn" disabled>
+              <i class="fas fa-check-circle"></i> Buat Pesanan
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card shadow">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">Ringkasan Pesanan</h5>
+        </div>
+        <div class="card-body">
+          <h6 class="mb-3">Item ({{ cart.get_total_items }})</h6>
+          {% for item in cart.items.all %}
+          <div class="d-flex justify-content-between mb-2">
+            <small>{{ item.product.name }} x{{ item.quantity }}</small>
+            <small>Rp {{ item.get_subtotal|floatformat:0 }}</small>
+          </div>
+          {% endfor %}
+
+          <hr>
+
+          <div class="d-flex justify-content-between mb-2">
+            <span>Subtotal</span>
+            <span id="subtotal-display">Rp {{ cart.get_total|floatformat:0 }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Ongkir</span>
+            <span id="shipping-display" class="text-muted">Pilih kecamatan</span>
+          </div>
+
+          <!-- Free Shipping Promo (if applicable) -->
+          <div id="free-shipping-promo" class="alert alert-success p-2 small" style="display: none;">
+            <i class="fas fa-gift"></i> Gratis ongkir untuk belanja ≥ Rp 100.000!
+          </div>
+
+          <hr>
+          <div class="d-flex justify-content-between">
+            <strong>Total</strong>
+            <strong class="text-success" id="total-display">Rp {{ cart.get_total|floatformat:0 }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const districtSelect = document.getElementById('district_id');
+  const shippingServiceGroup = document.getElementById('shipping-service-group');
+  const shippingOptions = document.getElementById('shipping-options');
+  const shippingServiceInput = document.getElementById('shipping_service');
+  const submitBtn = document.getElementById('submit-btn');
+
+  const subtotalDisplay = document.getElementById('subtotal-display');
+  const shippingDisplay = document.getElementById('shipping-display');
+  const totalDisplay = document.getElementById('total-display');
+  const freeShippingPromo = document.getElementById('free-shipping-promo');
+
+  const subtotal = {{ cart.get_total }};
+  let currentShippingCost = 0;
+
+  // Format currency
+  function formatCurrency(amount) {
+    return 'Rp ' + Math.round(amount).toLocaleString('id-ID');
+  }
+
+  // Update total display
+  function updateTotal() {
+    const total = subtotal + currentShippingCost;
+    totalDisplay.textContent = formatCurrency(total);
+  }
+
+  // Fetch shipping quotes when district is selected
+  districtSelect.addEventListener('change', function() {
+    const districtId = this.value;
+
+    if (!districtId) {
+      shippingServiceGroup.style.display = 'none';
+      shippingDisplay.textContent = 'Pilih kecamatan';
+      shippingDisplay.classList.add('text-muted');
+      submitBtn.disabled = true;
+      currentShippingCost = 0;
+      updateTotal();
+      return;
+    }
+
+    // Fetch shipping quotes via AJAX
+    fetch(`/shipping/quotes/?district_id=${districtId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Clear previous options
+          shippingOptions.innerHTML = '';
+
+          // Check if subtotal qualifies for free shipping promo
+          const isFreeShipping = subtotal >= 100000;
+          if (isFreeShipping) {
+            freeShippingPromo.style.display = 'block';
+          } else {
+            freeShippingPromo.style.display = 'none';
+          }
+
+          // Add radio buttons for each service
+          data.quotes.forEach((quote, index) => {
+            const cost = isFreeShipping ? 0 : quote.cost;
+            const costFormatted = isFreeShipping ? 'GRATIS' : quote.cost_formatted;
+
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'custom-control custom-radio mb-2';
+            optionDiv.innerHTML = `
+              <input type="radio" id="service_${quote.service}" name="shipping_radio"
+                     class="custom-control-input" value="${quote.service}"
+                     data-cost="${cost}" data-eta="${quote.eta}" ${index === 0 ? 'checked' : ''}>
+              <label class="custom-control-label" for="service_${quote.service}">
+                <strong>${quote.label}</strong> - ${costFormatted}
+                <br><small class="text-muted">${quote.eta}</small>
+              </label>
+            `;
+            shippingOptions.appendChild(optionDiv);
+          });
+
+          // Show shipping service group
+          shippingServiceGroup.style.display = 'block';
+
+          // Auto-select first option
+          const firstRadio = shippingOptions.querySelector('input[type="radio"]');
+          if (firstRadio) {
+            firstRadio.checked = true;
+            selectShippingService(firstRadio);
+          }
+
+          // Add event listeners to radio buttons
+          shippingOptions.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+              selectShippingService(this);
+            });
+          });
+        } else {
+          alert('Gagal memuat tarif pengiriman: ' + data.message);
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan dalam memuat tarif pengiriman.');
+      });
+  });
+
+  // Select shipping service
+  function selectShippingService(radio) {
+    const service = radio.value;
+    const cost = parseFloat(radio.dataset.cost);
+
+    // Update hidden input
+    shippingServiceInput.value = service;
+
+    // Update display
+    currentShippingCost = cost;
+    if (cost === 0 && subtotal >= 100000) {
+      shippingDisplay.innerHTML = '<span class="text-success"><strong>GRATIS</strong></span>';
+    } else {
+      shippingDisplay.textContent = formatCurrency(cost);
+      shippingDisplay.classList.remove('text-muted');
+    }
+
+    updateTotal();
+
+    // Enable submit button
+    submitBtn.disabled = false;
+  }
+
+  // Form validation
+  document.getElementById('checkout-form').addEventListener('submit', function(e) {
+    if (!shippingServiceInput.value) {
+      e.preventDefault();
+      alert('Silakan pilih layanan pengiriman terlebih dahulu.');
+      return false;
+    }
+  });
+
+  // Trigger change event if district is pre-selected
+  if (districtSelect.value) {
+    districtSelect.dispatchEvent(new Event('change'));
+  }
+});
+</script>
+
+<style>
+.custom-control-label {
+  cursor: pointer;
+}
+#shipping-options .custom-control {
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 5px;
+  transition: all 0.3s;
+}
+#shipping-options .custom-control:hover {
+  border-color: #17a2b8;
+  background-color: #f8f9fa;
+}
+#shipping-options input[type="radio"]:checked + label {
+  color: #17a2b8;
+  font-weight: 600;
+}
+#shipping-options .custom-control:has(input:checked) {
+  border-color: #17a2b8;
+  background-color: #e7f6f8;
+}
+</style>
+{% endblock %}

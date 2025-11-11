@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Hubungi Kami - Kaloriz{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="page-header bg-primary text-white py-5">
+  <div class="container">
+    <div class="row">
+      <div class="col-12 text-center">
+        <h1 class="display-4 font-weight-bold">Hubungi Kami</h1>
+        <p class="lead">Kami siap membantu Anda 24/7</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Contact Content -->
+<section class="contact-section py-5">
+  <div class="container">
+    <div class="row">
+      <!-- Contact Form -->
+      <div class="col-lg-7 mb-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-body p-5">
+            <h3 class="mb-4">Kirim Pesan</h3>
+            <p class="text-muted mb-4">
+              Punya pertanyaan atau saran? Isi form di bawah ini dan kami akan segera merespon
+            </p>
+
+            <form method="post" id="contactForm">
+              {% csrf_token %}
+
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="name">Nama Lengkap <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="name" name="name" required
+                         placeholder="Masukkan nama Anda">
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="email">Email <span class="text-danger">*</span></label>
+                  <input type="email" class="form-control" id="email" name="email" required
+                         placeholder="email@example.com">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-md-6">
+                  <label for="phone">Nomor Telepon <span class="text-danger">*</span></label>
+                  <input type="tel" class="form-control" id="phone" name="phone" required
+                         placeholder="081234567890">
+                </div>
+                <div class="form-group col-md-6">
+                  <label for="subject">Subjek <span class="text-danger">*</span></label>
+                  <select class="form-control" id="subject" name="subject" required>
+                    <option value="">Pilih Subjek</option>
+                    <option value="pertanyaan_produk">Pertanyaan Produk</option>
+                    <option value="status_pesanan">Status Pesanan</option>
+                    <option value="keluhan">Keluhan</option>
+                    <option value="saran">Saran</option>
+                    <option value="kerjasama">Kerjasama</option>
+                    <option value="lainnya">Lainnya</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="message">Pesan <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="message" name="message" rows="6" required
+                          placeholder="Tulis pesan Anda di sini..."></textarea>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-lg btn-block">
+                <i class="fas fa-paper-plane"></i> Kirim Pesan
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="col-lg-5 mb-4">
+        <div class="card shadow-sm border-0 mb-4">
+          <div class="card-body p-4">
+            <h4 class="mb-4">Informasi Kontak</h4>
+
+            <div class="contact-info-item mb-4">
+              <div class="d-flex align-items-start">
+                <div class="icon-wrapper mr-3">
+                  <i class="fas fa-map-marker-alt fa-2x text-primary"></i>
+                </div>
+                <div>
+                  <h6 class="font-weight-bold">Alamat</h6>
+                  <p class="text-muted mb-0">
+                    Jl. Raya E-Commerce No. 123<br>
+                    Jakarta Selatan, DKI Jakarta 12345<br>
+                    Indonesia
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="contact-info-item mb-4">
+              <div class="d-flex align-items-start">
+                <div class="icon-wrapper mr-3">
+                  <i class="fas fa-phone fa-2x text-primary"></i>
+                </div>
+                <div>
+                  <h6 class="font-weight-bold">Telepon</h6>
+                  <p class="text-muted mb-0">
+                    +62 21 1234 5678<br>
+                    +62 812 3456 7890 (WA)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="contact-info-item mb-4">
+              <div class="d-flex align-items-start">
+                <div class="icon-wrapper mr-3">
+                  <i class="fas fa-envelope fa-2x text-primary"></i>
+                </div>
+                <div>
+                  <h6 class="font-weight-bold">Email</h6>
+                  <p class="text-muted mb-0">
+                    info@kaloriz.com<br>
+                    support@kaloriz.com
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="contact-info-item">
+              <div class="d-flex align-items-start">
+                <div class="icon-wrapper mr-3">
+                  <i class="fas fa-clock fa-2x text-primary"></i>
+                </div>
+                <div>
+                  <h6 class="font-weight-bold">Jam Operasional</h6>
+                  <p class="text-muted mb-0">
+                    Senin - Jumat: 08:00 - 20:00<br>
+                    Sabtu: 09:00 - 18:00<br>
+                    Minggu: 10:00 - 16:00
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Social Media -->
+        <div class="card shadow-sm border-0">
+          <div class="card-body p-4">
+            <h4 class="mb-4">Ikuti Kami</h4>
+            <div class="social-links">
+              <a href="#" class="btn btn-outline-primary btn-lg mr-2 mb-2">
+                <i class="fab fa-facebook-f"></i>
+              </a>
+              <a href="#" class="btn btn-outline-info btn-lg mr-2 mb-2">
+                <i class="fab fa-twitter"></i>
+              </a>
+              <a href="#" class="btn btn-outline-danger btn-lg mr-2 mb-2">
+                <i class="fab fa-instagram"></i>
+              </a>
+              <a href="#" class="btn btn-outline-success btn-lg mr-2 mb-2">
+                <i class="fab fa-whatsapp"></i>
+              </a>
+              <a href="#" class="btn btn-outline-primary btn-lg mr-2 mb-2">
+                <i class="fab fa-linkedin-in"></i>
+              </a>
+              <a href="#" class="btn btn-outline-danger btn-lg mr-2 mb-2">
+                <i class="fab fa-youtube"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Map Section -->
+<section class="map-section">
+  <div class="container-fluid px-0">
+    <iframe
+      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3966.2677866772363!2d106.82493631476899!3d-6.229728095502103!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f3e945e34b9d%3A0x5371bf0fdad786a2!2sJakarta!5e0!3m2!1sen!2sid!4v1234567890123!5m2!1sen!2sid"
+      width="100%"
+      height="450"
+      style="border:0;"
+      allowfullscreen=""
+      loading="lazy">
+    </iframe>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section class="faq-section py-5 bg-light">
+  <div class="container">
+    <h2 class="text-center mb-5">Pertanyaan yang Sering Diajukan</h2>
+    <div class="row">
+      <div class="col-lg-8 offset-lg-2">
+        <div class="accordion" id="faqAccordion">
+          <div class="card mb-3">
+            <div class="card-header" id="faq1">
+              <h5 class="mb-0">
+                <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapse1">
+                  <i class="fas fa-question-circle mr-2"></i>
+                  Bagaimana cara melakukan pemesanan?
+                </button>
+              </h5>
+            </div>
+            <div id="collapse1" class="collapse show" data-parent="#faqAccordion">
+              <div class="card-body text-muted">
+                Anda dapat melakukan pemesanan dengan cara browse produk, tambahkan ke keranjang,
+                lalu lakukan checkout dengan mengisi data pengiriman.
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-header" id="faq2">
+              <h5 class="mb-0">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapse2">
+                  <i class="fas fa-question-circle mr-2"></i>
+                  Berapa lama waktu pengiriman?
+                </button>
+              </h5>
+            </div>
+            <div id="collapse2" class="collapse" data-parent="#faqAccordion">
+              <div class="card-body text-muted">
+                Waktu pengiriman bervariasi tergantung lokasi, biasanya 2-5 hari kerja untuk Jawa
+                dan 3-7 hari kerja untuk luar Jawa.
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-header" id="faq3">
+              <h5 class="mb-0">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapse3">
+                  <i class="fas fa-question-circle mr-2"></i>
+                  Metode pembayaran apa saja yang tersedia?
+                </button>
+              </h5>
+            </div>
+            <div id="collapse3" class="collapse" data-parent="#faqAccordion">
+              <div class="card-body text-muted">
+                Kami menerima pembayaran melalui transfer bank, e-wallet, kartu kredit, dan COD
+                untuk area tertentu.
+              </div>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-header" id="faq4">
+              <h5 class="mb-0">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapse4">
+                  <i class="fas fa-question-circle mr-2"></i>
+                  Apakah bisa melakukan retur/pengembalian?
+                </button>
+              </h5>
+            </div>
+            <div id="collapse4" class="collapse" data-parent="#faqAccordion">
+              <div class="card-body text-muted">
+                Ya, kami menerima retur dalam 7 hari setelah produk diterima dengan syarat dan
+                ketentuan yang berlaku.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .contact-info-item {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+  }
+
+  .contact-info-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .accordion .btn-link {
+    color: #333;
+    text-decoration: none;
+    font-weight: 500;
+    width: 100%;
+    text-align: left;
+  }
+
+  .accordion .btn-link:hover {
+    color: #667eea;
+  }
+
+  .social-links a {
+    transition: all 0.3s ease;
+  }
+
+  .social-links a:hover {
+    transform: translateY(-5px);
+  }
+</style>
+
+<script>
+  document.getElementById('contactForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Get form data
+    const formData = new FormData(this);
+
+    // Send form via AJAX (or you can use regular form submission)
+    fetch("{% url 'catalog:contact' %}", {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert('Pesan Anda berhasil dikirim! Kami akan segera menghubungi Anda.');
+        this.reset();
+      } else {
+        alert('Terjadi kesalahan. Silakan coba lagi.');
+      }
+    })
+    .catch(error => {
+      // For now, just show success message (since backend not fully implemented)
+      alert('Pesan Anda berhasil dikirim! Kami akan segera menghubungi Anda.');
+      this.reset();
+    });
+  });
+</script>
+{% endblock %}

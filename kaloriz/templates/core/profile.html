@@ -1,0 +1,239 @@
+{% extends 'core/profile_layout.html' %}
+
+{% block title %}Profil Pengguna - Kaloriz{% endblock %}
+
+{% block profile_content %}
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Informasi Pengguna</h2>
+      <p>Pastikan data Anda selalu terbaru untuk pengalaman belanja yang lebih nyaman.</p>
+    </div>
+    <a href="{% url 'core:profile_settings' %}" class="btn btn-primary">
+      <i class="fas fa-pen"></i> Edit Profil
+    </a>
+  </div>
+
+  <div class="profile-info-grid">
+    <div class="profile-info-item">
+      <span class="label">Nama Depan</span>
+      <span class="value">{{ user.first_name|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Nama Belakang</span>
+      <span class="value">{{ user.last_name|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Nama Lengkap</span>
+      <span class="value">{{ user.get_full_name|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Username</span>
+      <span class="value">{{ user.username }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Email</span>
+      <span class="value">{{ user.email|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Nomor Telepon</span>
+      <span class="value">{{ profile.phone|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Jenis Kelamin</span>
+      <span class="value">{{ profile.get_gender_display|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Tanggal Lahir</span>
+      <span class="value">{{ profile.birth_date|date:'d F Y'|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Alamat</span>
+      <span class="value">{{ profile.address|default:'Belum ada alamat utama' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Kota</span>
+      <span class="value">{{ profile.city|default:'-' }}</span>
+    </div>
+    <div class="profile-info-item">
+      <span class="label">Kode Pos</span>
+      <span class="value">{{ profile.postal_code|default:'-' }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Alamat Pengiriman</h2>
+      <p>Kelola alamat pengiriman agar pesanan Anda sampai tepat waktu.</p>
+    </div>
+    <button class="btn btn-primary" data-toggle="modal" data-target="#addAddressModal">
+      <i class="fas fa-plus"></i> Tambah Alamat
+    </button>
+  </div>
+
+  {% if user_addresses %}
+    <div class="profile-address-list">
+      {% for addr in user_addresses %}
+      <div class="address-card">
+        <div class="address-card-title">
+          <div>
+            <h4>{{ addr.full_name }}</h4>
+            <div class="address-badges">
+              <span class="address-badge">{{ addr.label }}</span>
+              {% if addr.is_default %}
+                <span class="address-badge default">Alamat Utama</span>
+              {% endif %}
+              {% if addr.used_in_orders %}
+                <span class="address-badge warning">Dipakai di pesanan</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="profile-address-actions">
+            <a href="{% url 'shipping:edit_address' addr.id %}" class="btn-icon" title="Edit alamat">
+              <i class="fas fa-pen"></i>
+            </a>
+            {% if not addr.is_default %}
+            <form method="post" action="{% url 'shipping:set_default_address' addr.id %}" class="inline-form">
+              {% csrf_token %}
+              <button type="submit" class="btn-icon" title="Jadikan alamat utama">
+                <i class="fas fa-star"></i>
+              </button>
+            </form>
+            {% endif %}
+            {% if addr.used_in_orders %}
+            <form method="post" action="{% url 'shipping:archive_address' addr.id %}" class="inline-form" onsubmit="return confirm('Arsipkan alamat ini?');">
+              {% csrf_token %}
+              <button type="submit" class="btn-icon warning" title="Arsipkan alamat">
+                <i class="fas fa-archive"></i>
+              </button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'shipping:delete_address' addr.id %}" class="inline-form" onsubmit="return confirm('Hapus alamat ini?');">
+              {% csrf_token %}
+              <button type="submit" class="btn-icon danger" title="Hapus alamat">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+            <form method="post" action="{% url 'shipping:archive_address' addr.id %}" class="inline-form" onsubmit="return confirm('Arsipkan alamat ini?');">
+              {% csrf_token %}
+              <button type="submit" class="btn-icon warning" title="Arsipkan alamat">
+                <i class="fas fa-archive"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        <div class="address-detail">
+          <div><strong>Telepon:</strong> {{ addr.phone }}</div>
+          <div><strong>Alamat:</strong> {{ addr.street_name }}</div>
+          {% if addr.detail %}
+          <div><strong>Detail:</strong> {{ addr.detail }}</div>
+          {% endif %}
+          <div>
+            <strong>Kecamatan:</strong> {{ addr.district.name }},
+            <strong>Kota:</strong> {{ addr.city }},
+            <strong>Provinsi:</strong> {{ addr.province }}
+            <strong>{{ addr.postal_code }}</strong>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="profile-empty">
+      <i class="fas fa-map-marked-alt"></i>
+      <h4>Belum ada alamat tersimpan</h4>
+      <p>Tambahkan alamat utama untuk memudahkan proses checkout.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Add Address Modal -->
+<div class="modal fade" id="addAddressModal" tabindex="-1" role="dialog" aria-labelledby="addAddressModalLabel">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addAddressModalLabel">Tambah Alamat Baru</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form method="post" action="{% url 'shipping:add_address' %}" class="profile-form">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Nama Lengkap *</label>
+              <input type="text" name="full_name" class="form-control" required value="{{ user.get_full_name }}">
+            </div>
+            <div class="form-group col-md-6">
+              <label>Nomor Telepon *</label>
+              <input type="tel" name="phone" class="form-control" required placeholder="08xxxxxxxxxx">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Provinsi *</label>
+              <input type="text" name="province" class="form-control" value="Sulawesi Selatan" readonly>
+            </div>
+            <div class="form-group col-md-6">
+              <label>Kota *</label>
+              <input type="text" name="city" class="form-control" value="Makassar" readonly>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Kecamatan *</label>
+              <select name="district_id" class="form-control" required>
+                <option value="">Pilih Kecamatan...</option>
+                {% for district in districts %}
+                  <option value="{{ district.id }}">{{ district.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label>Kode Pos *</label>
+              <input type="text" name="postal_code" class="form-control" required placeholder="90xxx" maxlength="5">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Nama Jalan / Gedung / No Rumah *</label>
+            <input type="text" name="street_name" class="form-control" required placeholder="Contoh: Jl. A.P. Pettarani No. 123">
+          </div>
+
+          <div class="form-group">
+            <label>Detail Lainnya</label>
+            <textarea name="detail" class="form-control" rows="3" placeholder="Contoh: Rumah cat hijau, dekat minimarket, RT 01 RW 02"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Tandai Sebagai *</label>
+              <select name="label" class="form-control" required>
+                <option value="Rumah">Rumah</option>
+                <option value="Kantor">Kantor</option>
+                <option value="Kos">Kos</option>
+              </select>
+            </div>
+            <div class="form-group col-md-6 d-flex align-items-center">
+              <div class="custom-control custom-checkbox mt-3">
+                <input type="checkbox" name="is_default" class="custom-control-input" id="is_default">
+                <label class="custom-control-label" for="is_default">Atur sebagai alamat utama</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Alamat</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

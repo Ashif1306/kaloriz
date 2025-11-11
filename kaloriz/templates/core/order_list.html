@@ -1,0 +1,60 @@
+{% extends 'core/profile_layout.html' %}
+
+{% block title %}Pesanan Saya - Kaloriz{% endblock %}
+
+{% block profile_content %}
+<div class="profile-section">
+  <div class="profile-section-header">
+    <div>
+      <h2>Riwayat Pesanan</h2>
+      <p>Pantau status pesanan dan akses detail transaksi Anda.</p>
+    </div>
+  </div>
+
+  {% if orders %}
+    <div class="table-responsive profile-table-wrapper">
+      <table class="profile-table">
+        <thead>
+          <tr>
+            <th>No. Pesanan</th>
+            <th>Tanggal</th>
+            <th>Status</th>
+            <th>Total</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+          <tr>
+            <td><strong>{{ order.order_number }}</strong></td>
+            <td>{{ order.created_at|date:"d M Y H:i" }}</td>
+            <td>
+              {% with badge=order.get_status_display_class %}
+                <span class="profile-badge {% if badge == 'success' %}success{% elif badge == 'warning' %}warning{% else %}info{% endif %}">
+                  {{ order.get_status_display }}
+                </span>
+              {% endwith %}
+            </td>
+            <td><strong>Rp {{ order.total|floatformat:0 }}</strong></td>
+            <td>
+              <a href="{% url 'core:order_detail' order.order_number %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-eye"></i> Detail
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="profile-empty">
+      <i class="fas fa-receipt"></i>
+      <h4>Belum ada pesanan</h4>
+      <p>Anda belum melakukan transaksi apa pun.</p>
+      <a href="{% url 'catalog:product_list' %}" class="btn btn-primary mt-3">
+        <i class="fas fa-shopping-bag"></i> Mulai Belanja
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

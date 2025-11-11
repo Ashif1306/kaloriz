@@ -1,0 +1,627 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load price_filters %}
+
+{% block title %}Home - Kaloriz{% endblock %}
+
+{% block extra_head %}
+<style>
+  .hero-slider {
+    position: relative;
+    margin-bottom: 50px;
+  }
+
+  .hero-slider .carousel-item {
+    height: clamp(320px, 70vh, 600px);
+    position: relative;
+  }
+
+  .hero-slider .carousel-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .hero-slider .carousel-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(4, 9, 30, 0.55), rgba(4, 9, 30, 0.35));
+    z-index: 1;
+  }
+
+  .hero-slider .carousel-caption {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 30px;
+    max-width: 560px;
+    width: calc(100% - 40px);
+    z-index: 2;
+    color: #fff;
+    text-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+
+  .hero-slider .carousel-caption h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #fff;
+    text-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .hero-slider .carousel-caption p {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .hero-slider .carousel-caption .btn {
+    padding: 12px 36px;
+    font-size: 1.05rem;
+  }
+
+  .hero-slider .carousel-indicators li {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: rgba(102, 126, 234, 0.4);
+  }
+
+  .hero-slider .carousel-indicators .active {
+    background-color: #667eea;
+  }
+
+  .hero-slider .carousel-control-prev,
+  .hero-slider .carousel-control-next {
+    width: 8%;
+  }
+
+  .hero-slider .carousel-control-prev-icon,
+  .hero-slider .carousel-control-next-icon {
+    filter: invert(54%) sepia(39%) saturate(449%) hue-rotate(203deg) brightness(92%) contrast(88%);
+  }
+
+  .stats-section {
+    background: #f8f9fa;
+    padding: 40px 0;
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: 20px;
+  }
+
+  .stat-item i {
+    font-size: 3rem;
+    color: #667eea;
+    margin-bottom: 15px;
+  }
+
+  .stat-item h3 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #333;
+  }
+
+  .stat-item p {
+    color: #666;
+    font-size: 1.1rem;
+  }
+
+  .category-icon {
+    font-size: 4rem;
+    color: #667eea;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 992px) {
+    .hero-slider .carousel-caption {
+      padding: 24px;
+    }
+    .hero-slider .carousel-caption h1 {
+      font-size: 2.4rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero-slider .carousel-item {
+      height: 420px;
+    }
+    .hero-slider .carousel-caption h1 {
+      font-size: 1.9rem;
+    }
+    .hero-slider .carousel-caption p {
+      font-size: 1.05rem;
+    }
+    .hero-slider .carousel-caption {
+      padding: 20px;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .hero-slider .carousel-item {
+      height: 360px;
+    }
+    .hero-slider .carousel-caption {
+      width: calc(100% - 24px);
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Slider Section -->
+<section class="hero-slider">
+  <div id="heroCarousel" class="carousel slide" data-ride="carousel" data-interval="5000">
+    <ol class="carousel-indicators">
+      <li data-target="#heroCarousel" data-slide-to="0" class="active"></li>
+      <li data-target="#heroCarousel" data-slide-to="1"></li>
+    </ol>
+    <div class="carousel-inner">
+      <div class="carousel-item active">
+        <img src="{% static 'images/banner.jpg' %}" alt="Promo Belanja Kaloriz"
+             onerror="this.src='https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=1920&h=1080&fit=crop'">
+        <div class="carousel-caption text-center">
+          <h1 class="animate__animated animate__fadeInDown">Selamat Datang di Kaloriz</h1>
+          <p class="lead animate__animated animate__fadeInUp mb-4">Belanja mudah dengan produk berkualitas pilihan terbaik.</p>
+          <div>
+            <a href="{% url 'catalog:product_list' %}" class="btn btn-primary mr-3 mb-2">
+              <i class="fas fa-shopping-bag"></i> Belanja Sekarang
+            </a>
+            <a href="{% url 'catalog:about' %}" class="btn btn-outline-primary mb-2">
+              <i class="fas fa-info-circle"></i> Tentang Kami
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="carousel-item">
+        <img src="https://images.unsplash.com/photo-1555529901-4ab7283885b4?w=1920&h=1080&fit=crop" alt="Diskon Spesial Kaloriz">
+        <div class="carousel-caption text-center">
+          <h1 class="animate__animated animate__fadeInDown">Diskon Spesial Minggu Ini</h1>
+          <p class="lead animate__animated animate__fadeInUp mb-4">Nikmati potongan harga hingga 50% untuk produk pilihan.</p>
+          <div>
+            <a href="{% url 'catalog:product_list' %}?promo=true" class="btn btn-primary mr-3 mb-2">
+              <i class="fas fa-tags"></i> Lihat Promo
+            </a>
+            <a href="{% url 'catalog:contact' %}" class="btn btn-outline-primary mb-2">
+              <i class="fas fa-headset"></i> Hubungi Kami
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a class="carousel-control-prev" href="#heroCarousel" role="button" data-slide="prev">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <span class="sr-only">Sebelumnya</span>
+    </a>
+    <a class="carousel-control-next" href="#heroCarousel" role="button" data-slide="next">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <span class="sr-only">Selanjutnya</span>
+    </a>
+  </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stats-section">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-4">
+        <div class="stat-item">
+          <i class="fas fa-box-open"></i>
+          <h3>{{ products_count|default:"12" }}+</h3>
+          <p>Produk Tersedia</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-item">
+          <i class="fas fa-users"></i>
+          <h3>0+</h3>
+          <p>Pelanggan Puas</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-item">
+          <i class="fas fa-truck"></i>
+          <h3>24/7</h3>
+          <p>Pengiriman Cepat</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories Section -->
+{% if categories %}
+<section class="categories-section py-5">
+  <div class="container">
+    <h2 class="text-center mb-4">Kategori Produk</h2>
+    <p class="text-center text-muted mb-5">Jelajahi berbagai kategori produk kami</p>
+    <div class="row">
+      {% for category in categories %}
+      <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm hover-shadow" style="border-top: 4px solid #667eea;">
+          <div class="card-body text-center">
+            <i class="category-icon fas
+              {% if 'elektronik' in category.name|lower %}fa-laptop
+              {% elif 'fashion' in category.name|lower %}fa-tshirt
+              {% elif 'makanan' in category.name|lower %}fa-utensils
+              {% elif 'buku' in category.name|lower %}fa-book
+              {% elif 'olahraga' in category.name|lower %}fa-dumbbell
+              {% else %}fa-box{% endif %}">
+            </i>
+            <h5 class="card-title font-weight-bold">{{ category.name }}</h5>
+            <p class="card-text text-muted">{{ category.description|truncatewords:10 }}</p>
+            <a href="{% url 'catalog:category_detail' category.slug %}" class="btn btn-primary">
+              <i class="fas fa-arrow-right"></i> Lihat Produk
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- Featured Products Section -->
+<section class="products-section py-5 bg-light">
+  <div class="container">
+    <h2 class="text-center mb-2">Produk Unggulan</h2>
+    <p class="text-center text-muted mb-5">Produk pilihan dengan penawaran terbaik</p>
+
+    {% if featured_products %}
+    <div class="row">
+      {% for product in featured_products %}
+      <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+        <div class="modern-product-card">
+          <!-- Discount Badge - Top Left -->
+          {% if product.is_on_sale %}
+          <div class="discount-badge">
+            -{{ product.get_discount_percentage }}%
+          </div>
+          {% endif %}
+
+          <!-- Wishlist Icon - Top Right -->
+          {% if user.is_authenticated %}
+          <div class="wishlist-icon" onclick="event.stopPropagation();">
+            <form method="post" action="{% url 'core:add_to_watchlist' product.id %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit" class="wishlist-btn {% if product.id in watchlisted_product_ids %}is-active{% endif %}">
+                <i class="{% if product.id in watchlisted_product_ids %}fa-solid{% else %}fa-regular{% endif %} fa-heart"></i>
+              </button>
+            </form>
+          </div>
+          {% endif %}
+
+          <!-- Product Image -->
+          <div class="product-image-wrapper" onclick="window.location.href='{% url 'catalog:product_detail' product.slug %}'">
+            {% if product.image %}
+              <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
+            {% else %}
+              <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop" alt="{{ product.name }}" class="product-image">
+            {% endif %}
+          </div>
+
+          <!-- Product Info -->
+          <div class="product-info" onclick="window.location.href='{% url 'catalog:product_detail' product.slug %}'">
+            <!-- Star Rating -->
+            {{ product|rating_stars }}
+
+            <!-- Product Name -->
+            <h3 class="product-name">{{ product.name|truncatewords:4 }}</h3>
+
+            <!-- Price -->
+            <div class="product-price">
+              {% if product.is_on_sale %}
+                <span class="price-original">Rp {{ product.price|dot_separator }}</span>
+                <span class="price-sale">Rp {{ product.get_display_price|dot_separator }}</span>
+              {% else %}
+                <span class="price-sale">Rp {{ product.price|dot_separator }}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Add to Cart Button - Bottom Right -->
+          {% if user.is_authenticated %}
+          <div class="cart-button-wrapper" onclick="event.stopPropagation();">
+            <form method="post" action="{% url 'core:add_to_cart' product.id %}" style="display: inline;" class="js-add-to-cart-form">
+              {% csrf_token %}
+              <input type="hidden" name="quantity" value="1">
+              <button type="submit" class="cart-btn-round" {% if product.stock == 0 %}disabled{% endif %}>
+                <i class="fas fa-shopping-cart"></i>
+              </button>
+            </form>
+          </div>
+          {% else %}
+          <div class="cart-button-wrapper" onclick="event.stopPropagation();">
+            <a href="{% url 'core:login' %}?next={{ request.path }}" class="cart-btn-round">
+              <i class="fas fa-sign-in-alt"></i>
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="{% url 'catalog:product_list' %}" class="btn btn-lg btn-outline-primary">
+        Lihat Semua Produk <i class="fas fa-arrow-right"></i>
+      </a>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center">
+      <i class="fas fa-info-circle"></i> Belum ada produk tersedia.
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Why Choose Us Section -->
+<section class="why-us-section py-5">
+  <div class="container">
+    <h2 class="text-center mb-5">Mengapa Pilih Kaloriz?</h2>
+    <div class="row">
+      <div class="col-md-3 col-sm-6 mb-4">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fas fa-shield-alt fa-3x text-primary"></i>
+          </div>
+          <h5>Produk Original</h5>
+          <p class="text-muted">100% produk original bergaransi</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6 mb-4">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fas fa-shipping-fast fa-3x text-primary"></i>
+          </div>
+          <h5>Pengiriman Cepat</h5>
+          <p class="text-muted">Pengiriman ke seluruh Makassar</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6 mb-4">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fas fa-lock fa-3x text-primary"></i>
+          </div>
+          <h5>Pembayaran Aman</h5>
+          <p class="text-muted">Transaksi dijamin aman</p>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6 mb-4">
+        <div class="text-center">
+          <div class="mb-3">
+            <i class="fas fa-headset fa-3x text-primary"></i>
+          </div>
+          <h5>Customer Service</h5>
+          <p class="text-muted">Siap melayani 24/7</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+/* Modern Product Card Styles */
+.modern-product-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 15px;
+  position: relative;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.modern-product-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+/* Discount Badge - Top Left */
+.discount-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(135deg, #ff416c, #ff4b2b);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(255, 65, 108, 0.4);
+}
+
+/* Wishlist Icon - Top Right */
+.wishlist-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
+.wishlist-btn {
+  background: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.wishlist-btn:hover {
+  background: rgba(220, 34, 32, 0.12);
+  transform: scale(1.1);
+}
+
+.wishlist-btn .fa-heart {
+  font-size: 1.1rem;
+  color: #cbd5f5;
+  transition: color 0.3s ease;
+}
+
+.wishlist-btn.is-active {
+  background: rgba(220, 34, 32, 0.12);
+}
+
+.wishlist-btn.is-active .fa-heart {
+  color: #dc2220;
+}
+
+.wishlist-btn:hover .fa-heart {
+  color: #dc2220;
+}
+
+/* Product Image */
+.product-image-wrapper {
+  width: 100%;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
+  border-radius: 15px;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.modern-product-card:hover .product-image {
+  transform: scale(1.05);
+}
+
+/* Product Info */
+.product-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 5px;
+}
+
+/* Star Rating */
+.product-rating {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.product-rating i {
+  color: #ffc107;
+  font-size: 0.9rem;
+}
+
+.rating-text {
+  margin-left: 5px;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 600;
+}
+
+/* Product Name */
+.product-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 4px;
+  line-height: 1.4;
+  min-height: 2.8em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Product Price */
+.product-price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 15px;
+}
+
+.price-original {
+  color: #dc3545;
+  font-size: 0.85rem;
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
+.price-sale {
+  color: #28a745;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+/* Cart Button - Bottom Right */
+.cart-button-wrapper {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+}
+
+.cart-btn-round {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+  font-size: 1.1rem;
+}
+
+.cart-btn-round:hover {
+  transform: scale(1.15);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  background: linear-gradient(135deg, #764ba2, #667eea);
+}
+
+.cart-btn-round:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .product-image-wrapper {
+    height: 180px;
+  }
+
+  .product-name {
+    font-size: 0.95rem;
+  }
+
+  .price-sale {
+    font-size: 1.1rem;
+  }
+}
+</style>
+{% endblock %}

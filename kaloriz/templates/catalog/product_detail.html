@@ -1,0 +1,876 @@
+{% extends 'base.html' %}
+{% load price_filters nutrition_tags %}
+
+{% block title %}{{ product.name }} - Kaloriz{% endblock %}
+
+{% block content %}
+<style>
+  .info-card {
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    opacity: 0;
+    transform: translateY(24px);
+    animation: cardFadeUp 0.7s ease forwards;
+  }
+
+  .description-card {
+    animation-delay: 0.1s;
+  }
+
+  .nutrition-card {
+    animation-delay: 0.25s;
+  }
+
+  .info-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 28px 55px rgba(15, 23, 42, 0.12);
+  }
+
+  .info-card .card-title {
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: 0.3px;
+  }
+
+  .product-description {
+    line-height: 1.75;
+    color: #475569;
+    font-size: 0.95rem;
+  }
+
+  .nutrition-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .nutrition-item {
+    background: linear-gradient(135deg, rgba(15, 118, 255, 0.08), rgba(59, 130, 246, 0.02));
+    border-radius: 16px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
+    opacity: 0;
+    transform: translateY(16px);
+    animation: itemFadeUp 0.55s ease forwards;
+    animation-delay: calc(0.2s + var(--item-index, 0) * 0.08s);
+  }
+
+  .nutrition-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 30px rgba(37, 99, 235, 0.12);
+  }
+
+  .nutrition-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .nutrition-label {
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .nutrition-value {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .nutrition-progress {
+    height: 8px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .nutrition-progress-bar {
+    position: relative;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #38bdf8);
+    width: 0;
+    animation: growBar 0.9s ease forwards;
+    animation-delay: calc(0.28s + var(--item-index, 0) * 0.1s);
+  }
+
+  .nutrition-progress-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0));
+  }
+
+  .nutrition-item--vitamins {
+    background: rgba(248, 250, 252, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+
+  .nutrition-item--vitamins .nutrition-highlight {
+    position: absolute;
+    left: 18px;
+    bottom: 12px;
+    width: 120px;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+    opacity: 0.75;
+  }
+
+  @keyframes cardFadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes itemFadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes growBar {
+    from {
+      width: 0;
+    }
+    to {
+      width: min(100%, var(--progress-width, 0%));
+    }
+  }
+
+  @media (max-width: 992px) {
+    .info-card {
+      border-radius: 16px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .info-card {
+      margin-bottom: 1.5rem;
+    }
+
+    .nutrition-item {
+      padding: 14px 16px;
+    }
+
+    .nutrition-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .info-card,
+    .nutrition-item,
+    .nutrition-progress-bar {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+<div class="container my-5">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'catalog:home' %}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'catalog:product_list' %}">Produk</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'catalog:category_detail' product.category.slug %}">{{ product.category.name }}</a></li>
+      <li class="breadcrumb-item active">{{ product.name }}</li>
+    </ol>
+  </nav>
+
+  <div class="row">
+    <!-- Product Image -->
+    <div class="col-md-5">
+      <div class="card shadow">
+        {% if product.image %}
+          <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
+        {% else %}
+          <img src="https://via.placeholder.com/500x500?text={{ product.name }}" class="card-img-top" alt="{{ product.name }}">
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Product Info -->
+    <div class="col-md-7">
+      <h1 class="mb-3">{{ product.name }}</h1>
+
+      {% if product.is_on_sale %}
+        <span class="badge badge-danger badge-lg mb-3">Diskon {{ product.get_discount_percentage }}%</span>
+      {% endif %}
+
+      <div class="mb-3">
+        <small class="text-muted">Kategori:</small>
+        <a href="{% url 'catalog:category_detail' product.category.slug %}" class="badge badge-info">
+          {{ product.category.name }}
+        </a>
+      </div>
+
+      <!-- Price -->
+      <div class="mb-4">
+        {% if product.is_on_sale %}
+          <h4 class="text-muted"><s>Rp {{ product.price|dot_separator }}</s></h4>
+          <h2 class="text-danger font-weight-bold">Rp {{ product.get_display_price|dot_separator }}</h2>
+        {% else %}
+          <h2 class="text-primary font-weight-bold">Rp {{ product.price|dot_separator }}</h2>
+        {% endif %}
+      </div>
+
+      <!-- Stock -->
+      <div class="mb-4">
+        <p>
+          <i class="fas fa-box text-primary"></i>
+          <strong>Stok:</strong>
+          {% if product.stock > 0 %}
+            <span class="text-success">{{ product.stock }} tersedia</span>
+          {% else %}
+            <span class="text-danger">Habis</span>
+          {% endif %}
+        </p>
+      </div>
+
+      <!-- Modern Purchase Section -->
+      {% if user.is_authenticated %}
+        {% if product.stock > 0 %}
+          <div class="modern-purchase-section">
+            <!-- Row 1: Quantity Selector + Add to Cart -->
+            <div class="purchase-row-1">
+              <!-- Quantity Selector -->
+              <div class="quantity-selector">
+                <button type="button" class="qty-btn" onclick="decreaseQty()">
+                  <i class="fas fa-minus"></i>
+                </button>
+                <input type="number" id="quantity" value="1" min="1" max="{{ product.stock }}" readonly>
+                <button type="button" class="qty-btn" onclick="increaseQty({{ product.stock }})">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </div>
+
+              <!-- Add to Cart Button -->
+              <form method="post" action="{% url 'core:add_to_cart' product.id %}" style="flex: 1;" class="js-add-to-cart-form">
+                {% csrf_token %}
+                <input type="hidden" name="quantity" id="cart-quantity" value="1">
+                <button type="submit" class="btn-add-cart">
+                  <i class="fas fa-shopping-cart"></i> Add to Cart
+                </button>
+              </form>
+            </div>
+
+            <!-- Row 2: Buy It Now Button -->
+            <button type="button" class="btn-buy-now" onclick="buyNow({{ product.id }})">
+              <i class="fas fa-bolt"></i> Buy It Now
+            </button>
+          </div>
+        {% else %}
+          <div class="out-of-stock">
+            <i class="fas fa-times-circle"></i> Produk Habis
+          </div>
+        {% endif %}
+      {% else %}
+        <a href="{% url 'core:login' %}?next={{ request.path }}" class="btn-buy-now" style="display: inline-block;">
+          <i class="fas fa-sign-in-alt"></i> Login untuk Membeli
+        </a>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- Description & Nutrition Section -->
+  <div class="row mt-5">
+    <div class="col-lg-7 mb-4 mb-lg-0">
+      <div class="card shadow-sm h-100 info-card description-card">
+        <div class="card-body">
+          <h4 class="card-title mb-3">Deskripsi Produk</h4>
+          <div class="product-description">
+            {{ product.description|linebreaks }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card shadow-sm h-100 info-card nutrition-card">
+        <div class="card-body">
+          <h4 class="card-title mb-3">Nutrisi</h4>
+          {% if product.has_nutrition_info %}
+            <div class="nutrition-list">
+              {% if product.calories is not None %}
+                <div class="nutrition-item" style="--item-index: 0;">
+                  <div class="nutrition-header">
+                    <span class="nutrition-label">Kalori</span>
+                    <strong class="nutrition-value">{{ product.calories }} kcal</strong>
+                  </div>
+                  <div class="nutrition-progress">
+                    <div class="nutrition-progress-bar" style="--progress-width: {{ product.calories|nutrition_percent:600 }}%;"></div>
+                  </div>
+                </div>
+              {% endif %}
+              {% if product.protein is not None %}
+                <div class="nutrition-item" style="--item-index: 1;">
+                  <div class="nutrition-header">
+                    <span class="nutrition-label">Protein</span>
+                    <strong class="nutrition-value">{{ product.protein|floatformat:-2 }} g</strong>
+                  </div>
+                  <div class="nutrition-progress">
+                    <div class="nutrition-progress-bar" style="--progress-width: {{ product.protein|nutrition_percent:40 }}%;"></div>
+                  </div>
+                </div>
+              {% endif %}
+              {% if product.fat is not None %}
+                <div class="nutrition-item" style="--item-index: 2;">
+                  <div class="nutrition-header">
+                    <span class="nutrition-label">Lemak</span>
+                    <strong class="nutrition-value">{{ product.fat|floatformat:-2 }} g</strong>
+                  </div>
+                  <div class="nutrition-progress">
+                    <div class="nutrition-progress-bar" style="--progress-width: {{ product.fat|nutrition_percent:30 }}%;"></div>
+                  </div>
+                </div>
+              {% endif %}
+              {% if product.carbohydrates is not None %}
+                <div class="nutrition-item" style="--item-index: 3;">
+                  <div class="nutrition-header">
+                    <span class="nutrition-label">Karbohidrat</span>
+                    <strong class="nutrition-value">{{ product.carbohydrates|floatformat:-2 }} g</strong>
+                  </div>
+                  <div class="nutrition-progress">
+                    <div class="nutrition-progress-bar" style="--progress-width: {{ product.carbohydrates|nutrition_percent:80 }}%;"></div>
+                  </div>
+                </div>
+              {% endif %}
+              {% if product.fiber is not None %}
+                <div class="nutrition-item" style="--item-index: 4;">
+                  <div class="nutrition-header">
+                    <span class="nutrition-label">Serat</span>
+                    <strong class="nutrition-value">{{ product.fiber|floatformat:-2 }} g</strong>
+                  </div>
+                  <div class="nutrition-progress">
+                    <div class="nutrition-progress-bar" style="--progress-width: {{ product.fiber|nutrition_percent:25 }}%;"></div>
+                  </div>
+                </div>
+              {% endif %}
+              {% if product.vitamins %}
+                <div class="nutrition-item nutrition-item--vitamins" style="--item-index: 5;">
+                  <div class="nutrition-header">
+                    <span class="nutrition-label text-muted">Vitamin</span>
+                    <strong class="nutrition-value">{{ product.vitamins }}</strong>
+                  </div>
+                  <div class="nutrition-highlight"></div>
+                </div>
+              {% endif %}
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">Informasi nutrisi belum tersedia.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Testimonials Carousel -->
+  {% if testimonials %}
+  <div class="mt-5 mb-5">
+    <h3 class="text-center mb-4">Testimoni Pelanggan</h3>
+    <div class="testimonial-carousel-container">
+      <div class="testimonial-carousel" id="testimonialCarousel">
+        {% for testimonial in testimonials %}
+        <div class="testimonial-card" data-index="{{ forloop.counter0 }}">
+          <div class="testimonial-content">
+            <div class="rating mb-2">
+              {% for i in "12345" %}
+                {% if forloop.counter <= testimonial.rating %}
+                  <i class="fas fa-star text-warning"></i>
+                {% else %}
+                  <i class="far fa-star text-warning"></i>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <p class="testimonial-text">"{{ testimonial.review }}"</p>
+            <div class="testimonial-author mt-3">
+              <div class="d-flex align-items-center">
+                <div class="author-photo mr-3">
+                  {% if testimonial.photo %}
+                    <img src="{{ testimonial.photo.url }}" alt="{{ testimonial.user.username }}">
+                  {% else %}
+                    <div class="photo-placeholder">{{ testimonial.user.username|slice:":1"|upper }}</div>
+                  {% endif %}
+                </div>
+                <div>
+                  <strong>{{ testimonial.user.get_full_name|default:testimonial.user.username }}</strong>
+                  <br>
+                  <small class="text-muted">{{ testimonial.created_at|date:"d M Y" }}</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Navigation Arrows -->
+      <button class="carousel-arrow carousel-arrow-left" onclick="moveCarousel(-1)">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <button class="carousel-arrow carousel-arrow-right" onclick="moveCarousel(1)">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Related Products -->
+  {% if related_products %}
+  <div class="mt-5">
+    <h3 class="mb-4">Produk Terkait</h3>
+    <div class="row">
+      {% for related in related_products %}
+      <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+        <div class="card h-100 shadow-sm hover-shadow">
+          {% if related.image %}
+            <img src="{{ related.image.url }}" class="card-img-top" alt="{{ related.name }}" style="height: 200px; object-fit: cover;">
+          {% else %}
+            <img src="https://via.placeholder.com/300x200?text={{ related.name }}" class="card-img-top" alt="{{ related.name }}">
+          {% endif %}
+
+          <div class="card-body">
+            <h5 class="card-title">{{ related.name|truncatewords:5 }}</h5>
+            <p class="h6 text-primary">Rp {{ related.get_display_price|floatformat:0 }}</p>
+          </div>
+
+          <div class="card-footer bg-white">
+            <a href="{% url 'catalog:product_detail' related.slug %}" class="btn btn-sm btn-outline-primary btn-block">
+              Lihat Detail
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.hover-shadow:hover {
+  transform: translateY(-5px);
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important;
+}
+
+/* Modern Purchase Section */
+.modern-purchase-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+/* Row 1: Quantity + Add to Cart */
+.purchase-row-1 {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+/* Quantity Selector - Oval */
+.quantity-selector {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 50px;
+  padding: 8px 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+}
+
+.quantity-selector:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  border-color: #667eea;
+}
+
+.qty-btn {
+  background: none;
+  border: none;
+  color: #2d3748;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 5px 10px;
+  transition: all 0.3s ease;
+}
+
+.qty-btn:hover {
+  color: #667eea;
+  transform: scale(1.2);
+}
+
+.quantity-selector input {
+  border: none;
+  text-align: center;
+  width: 50px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2d3748;
+  background: transparent;
+  outline: none;
+}
+
+/* Add to Cart Button - White with Red Border */
+.btn-add-cart {
+  background: white;
+  border: 3px solid #dc3545;
+  color: #2d3748;
+  font-weight: 600;
+  padding: 12px 30px;
+  border-radius: 50px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+  text-decoration: none;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.btn-add-cart:hover {
+  background: #dc3545;
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+}
+
+.btn-add-cart i {
+  margin-right: 8px;
+}
+
+/* Buy It Now Button - Dark Green - Full Width */
+.btn-buy-now {
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+  border: none;
+  color: white;
+  font-weight: 700;
+  padding: 12px 35px;
+  border-radius: 50px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  text-decoration: none;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.btn-buy-now:hover {
+  background: linear-gradient(135deg, #1e7e34, #28a745);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(40, 167, 69, 0.5);
+  color: white;
+  text-decoration: none;
+}
+
+.btn-buy-now i {
+  margin-right: 8px;
+}
+
+/* Out of Stock */
+.out-of-stock {
+  background: #e0e0e0;
+  color: #666;
+  padding: 15px 30px;
+  border-radius: 50px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 20px;
+}
+
+@media (max-width: 576px) {
+  .purchase-row-1 {
+    flex-direction: column;
+  }
+
+  .quantity-selector {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Testimonial Carousel Styles */
+.testimonial-carousel-container {
+  position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px 60px;
+}
+
+.testimonial-carousel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  min-height: 300px;
+}
+
+.testimonial-card {
+  background: #2d3748;
+  border-radius: 15px;
+  padding: 30px;
+  color: white;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  transition: all 0.5s ease;
+  opacity: 1;
+}
+
+.testimonial-card.slide-out-left {
+  animation: slideOutLeft 0.5s ease forwards;
+}
+
+.testimonial-card.slide-out-right {
+  animation: slideOutRight 0.5s ease forwards;
+}
+
+.testimonial-card.slide-in-left {
+  animation: slideInLeft 0.5s ease forwards;
+}
+
+.testimonial-card.slide-in-right {
+  animation: slideInRight 0.5s ease forwards;
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-100%); opacity: 0; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.testimonial-text {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  font-style: italic;
+  margin: 20px 0;
+}
+
+.author-photo {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #ffc107;
+}
+
+.author-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #ffc107;
+  color: #2d3748;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ffc107;
+  color: #2d3748;
+  border: none;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.carousel-arrow:hover {
+  background: #ffdd57;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-arrow-left {
+  left: 0;
+}
+
+.carousel-arrow-right {
+  right: 0;
+}
+
+.rating i {
+  font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .testimonial-carousel {
+    grid-template-columns: 1fr;
+  }
+
+  .testimonial-carousel-container {
+    padding: 20px 40px;
+  }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Quantity Controls
+function increaseQty(maxStock) {
+  const qtyInput = document.getElementById('quantity');
+  const cartQtyInput = document.getElementById('cart-quantity');
+  let currentQty = parseInt(qtyInput.value);
+
+  if (currentQty < maxStock) {
+    currentQty++;
+    qtyInput.value = currentQty;
+    if (cartQtyInput) cartQtyInput.value = currentQty;
+  }
+}
+
+function decreaseQty() {
+  const qtyInput = document.getElementById('quantity');
+  const cartQtyInput = document.getElementById('cart-quantity');
+  let currentQty = parseInt(qtyInput.value);
+
+  if (currentQty > 1) {
+    currentQty--;
+    qtyInput.value = currentQty;
+    if (cartQtyInput) cartQtyInput.value = currentQty;
+  }
+}
+
+// Buy It Now - Direct Checkout
+function buyNow(productId) {
+  const quantity = document.getElementById('quantity').value;
+
+  // Add to cart first
+  fetch(`/cart/add/${productId}/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: `quantity=${quantity}&buy_now=true`
+  })
+  .then(response => {
+    // Redirect to checkout
+    window.location.href = '/checkout/';
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Terjadi kesalahan. Silakan coba lagi.');
+  });
+}
+
+// Testimonial Carousel
+let currentIndex = 0;
+const testimonialCards = document.querySelectorAll('.testimonial-card');
+const totalTestimonials = testimonialCards.length;
+const itemsPerPage = 2;
+let isAnimating = false;
+
+function updateCarousel() {
+  testimonialCards.forEach((card, index) => {
+    if (index >= currentIndex && index < currentIndex + itemsPerPage) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+function moveCarousel(direction) {
+  if (isAnimating || totalTestimonials <= itemsPerPage) return;
+
+  isAnimating = true;
+
+  // Get visible cards
+  const visibleCards = Array.from(testimonialCards).slice(currentIndex, currentIndex + itemsPerPage);
+
+  // Animate out
+  visibleCards.forEach(card => {
+    card.classList.add(direction > 0 ? 'slide-out-left' : 'slide-out-right');
+  });
+
+  setTimeout(() => {
+    // Update index
+    currentIndex += direction * itemsPerPage;
+
+    // Loop around
+    if (currentIndex >= totalTestimonials) {
+      currentIndex = 0;
+    } else if (currentIndex < 0) {
+      currentIndex = Math.max(0, totalTestimonials - itemsPerPage);
+    }
+
+    // Remove animation classes
+    testimonialCards.forEach(card => {
+      card.classList.remove('slide-out-left', 'slide-out-right', 'slide-in-left', 'slide-in-right');
+    });
+
+    // Update display
+    updateCarousel();
+
+    // Get new visible cards
+    const newVisibleCards = Array.from(testimonialCards).slice(currentIndex, currentIndex + itemsPerPage);
+
+    // Animate in
+    newVisibleCards.forEach(card => {
+      card.classList.add(direction > 0 ? 'slide-in-right' : 'slide-in-left');
+    });
+
+    setTimeout(() => {
+      testimonialCards.forEach(card => {
+        card.classList.remove('slide-in-left', 'slide-in-right');
+      });
+      isAnimating = false;
+    }, 500);
+  }, 500);
+}
+
+// Initialize
+if (testimonialCards.length > 0) {
+  updateCarousel();
+}
+</script>
+{% endblock %}
