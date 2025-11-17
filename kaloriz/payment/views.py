@@ -23,9 +23,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from catalog.models import DiscountCode
-from core.models import Order
+from core.models import Order, PaymentMethod
 from core.views import _get_active_cart, _prepare_selected_cart_items
-from core.services.orders import create_order_from_checkout, restore_order_stock
+from core.services.orders import create_order_from_checkout, restore_order_stock, cancel_order_due_to_timeout
+from payment.services import get_or_create_midtrans_snap_token
 from shipping.models import Address
 
 logger = logging.getLogger(__name__)
@@ -165,6 +166,69 @@ def _to_decimal(value) -> Decimal:
 
 def _to_int_amount(value: Decimal) -> int:
     return int(_to_decimal(value).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _extract_order_number_from_midtrans(order_id: str | None) -> str:
+    if not order_id:
+        return ""
+    separator = getattr(Order, "MIDTRANS_RETRY_SEPARATOR", "::retry::")
+    if separator not in order_id:
+        return order_id
+    return order_id.split(separator, 1)[0]
+
+
+def _extract_midtrans_error(exc: Exception, default_message: str) -> tuple[str, dict | None, int | None]:
+    """Return a friendly error message and the raw payload if available."""
+
+    response_payload = None
+    status_code = None
+    message = default_message
+
+    payload_candidates = []
+    for attr in ("api_response", "response", "body"):
+        value = getattr(exc, attr, None)
+        if value:
+            payload_candidates.append(value)
+
+    for payload in payload_candidates:
+        data = payload
+        if isinstance(data, bytes):
+            try:
+                data = data.decode("utf-8")
+            except Exception:  # pragma: no cover - defensive
+                data = data.decode("latin-1", errors="replace")
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:  # pragma: no cover - payload may not be JSON
+                data = {"raw": data}
+
+        if isinstance(data, dict):
+            response_payload = data
+            status_code = data.get("status_code") or data.get("status")
+
+            message = (
+                data.get("status_message")
+                or data.get("message")
+                or data.get("error_message")
+                or data.get("error")
+                or default_message
+            )
+
+            validation_messages = data.get("validation_messages")
+            if not message and isinstance(validation_messages, list):
+                message = "; ".join(map(str, validation_messages))
+            break
+
+    if (not response_payload) and hasattr(exc, "message"):
+        maybe_message = getattr(exc, "message")
+        if isinstance(maybe_message, str) and maybe_message.strip():
+            message = maybe_message.strip()
+
+    if (not response_payload) and not message:
+        message = str(exc) or default_message
+
+    return message, response_payload, status_code
 
 
 def _build_midtrans_client():
@@ -326,6 +390,147 @@ def _build_doku_line_items(
     return line_items
 
 
+def _calculate_order_discount_amount(order: Order) -> Decimal:
+    subtotal = _to_decimal(order.subtotal)
+    shipping_cost = _to_decimal(order.shipping_cost)
+    total = _to_decimal(order.total)
+    discount = subtotal + shipping_cost - total
+    if discount < 0:
+        return Decimal("0")
+    return discount
+
+
+def _build_order_payment_item_details(order: Order) -> list[dict]:
+    details: list[dict] = []
+    for item in order.items.all():
+        price = _to_int_amount(item.product_price)
+        details.append(
+            {
+                "id": str(item.product_id or item.pk),
+                "price": price,
+                "quantity": int(item.quantity),
+                "name": (item.product_name or "Produk")[:50],
+            }
+        )
+
+    shipping_cost = _to_decimal(order.shipping_cost)
+    if shipping_cost > 0:
+        details.append(
+            {
+                "id": "SHIPPING",
+                "price": _to_int_amount(shipping_cost),
+                "quantity": 1,
+                "name": "Ongkos Kirim",
+            }
+        )
+
+    discount_amount = _calculate_order_discount_amount(order)
+    if discount_amount > 0:
+        details.append(
+            {
+                "id": "DISCOUNT",
+                "price": -_to_int_amount(discount_amount),
+                "quantity": 1,
+                "name": "Diskon",
+            }
+        )
+
+    return details
+
+
+def _build_order_customer_details(order: Order) -> dict:
+    shipping_address = order.shipping_address
+    fallback_name = order.user.get_full_name() or order.user.username
+    full_name = order.full_name or getattr(shipping_address, "full_name", "") or fallback_name
+    email = order.email or order.user.email or "customer@example.com"
+    phone = order.phone or getattr(shipping_address, "phone", "")
+    address_text = (
+        shipping_address.get_full_address()
+        if shipping_address
+        else (order.address or "")
+    )
+    city = order.city or getattr(shipping_address, "city", "")
+    postal_code = order.postal_code or getattr(shipping_address, "postal_code", "")
+
+    address_payload = {
+        "first_name": full_name,
+        "last_name": "",
+        "email": email,
+        "phone": phone,
+        "address": address_text,
+        "city": city,
+        "postal_code": postal_code,
+        "country_code": "IDN",
+    }
+
+    return {
+        "first_name": full_name,
+        "last_name": "",
+        "email": email,
+        "phone": phone,
+        "billing_address": address_payload,
+        "shipping_address": address_payload,
+    }
+
+
+def _build_order_customer_payload(order: Order) -> dict:
+    customer_details = _build_order_customer_details(order)
+    shipping_address = customer_details.get("shipping_address", {})
+    return {
+        "name": customer_details.get("first_name", ""),
+        "email": customer_details.get("email", ""),
+        "phone": customer_details.get("phone", ""),
+        "address": shipping_address.get("address", ""),
+    }
+
+
+def _build_doku_line_items_from_order(order: Order) -> list[dict]:
+    line_items: list[dict] = []
+
+    for item in order.items.all():
+        line_items.append(
+            {
+                "name": (item.product_name or "Produk")[:50],
+                "price": _to_int_amount(item.product_price),
+                "quantity": int(item.quantity),
+            }
+        )
+
+    shipping_cost = _to_decimal(order.shipping_cost)
+    if shipping_cost > 0:
+        line_items.append(
+            {
+                "name": "Ongkos Kirim",
+                "price": _to_int_amount(shipping_cost),
+                "quantity": 1,
+            }
+        )
+
+    discount_amount = _calculate_order_discount_amount(order)
+    if discount_amount > 0:
+        line_items.append(
+            {
+                "name": "Diskon",
+                "price": -_to_int_amount(discount_amount),
+                "quantity": 1,
+            }
+        )
+
+    total_amount = _to_decimal(order.total)
+    if total_amount <= 0:
+        return []
+
+    if not line_items:
+        return [
+            {
+                "name": "Total Pesanan",
+                "price": _to_int_amount(total_amount),
+                "quantity": 1,
+            }
+        ]
+
+    return line_items
+
 @csrf_exempt
 @login_required
 @require_POST
@@ -365,6 +570,16 @@ def payment_create_snap_token(request):
             status=400,
         )
     address_id = checkout_data.get("address_id")
+    payment_method_obj = (
+        PaymentMethod.objects.filter(slug__iexact=selected_payment_slug).first()
+        if selected_payment_slug
+        else None
+    )
+    payment_method_obj = (
+        PaymentMethod.objects.filter(slug__iexact=selected_payment_slug).first()
+        if selected_payment_slug
+        else None
+    )
     shipping_address = (
         Address.objects.filter(id=address_id, user=request.user, is_deleted=False)
         .select_related("district")
@@ -420,19 +635,6 @@ def payment_create_snap_token(request):
     eta = checkout_data.get("eta")
     notes = checkout_data.get("notes", "")
 
-    transaction_payload = {
-        "transaction_details": {
-            "order_id": order_id,
-            "gross_amount": _to_int_amount(total),
-        },
-        "item_details": item_details,
-        "customer_details": _build_customer_details(shipping_address, request.user),
-        "credit_card": {"secure": True},
-        "callbacks": {
-            "finish": request.build_absolute_uri("/payment/finish/"),
-        },
-    }
-
     token = None
     order = None
     try:
@@ -458,17 +660,43 @@ def payment_create_snap_token(request):
                 notes=notes,
                 shipping_address_obj=shipping_address,
                 shipping_service_name=service_label,
+                payment_method_slug=selected_payment_slug,
+                payment_method_display=(payment_method_obj.name if payment_method_obj else selected_payment_slug),
             )
+            midtrans_order_id = order.ensure_midtrans_order_id()
+
+            transaction_payload = {
+                "transaction_details": {
+                    "order_id": midtrans_order_id,
+                    "gross_amount": _to_int_amount(total),
+                },
+                "item_details": item_details,
+                "customer_details": _build_customer_details(shipping_address, request.user),
+                "credit_card": {"secure": True},
+                "callbacks": {
+                    "finish": request.build_absolute_uri("/payment/finish/"),
+                },
+                "custom_field1": order.order_number,
+            }
+
             snap_response = snap_client.create_transaction(transaction_payload)
             token = snap_response.get("token")
             if not token:
                 raise RuntimeError("Token Snap tidak tersedia.")
+            order.midtrans_token = token
+            order.save(update_fields=["midtrans_token"])
     except RuntimeError as exc:  # Token missing or business rule failure
         logger.exception("Failed to create Midtrans Snap transaction: %s", exc)
         return JsonResponse({"message": str(exc)}, status=500)
     except Exception as exc:  # pylint: disable=broad-except
-        logger.exception("Failed to create order or Snap transaction: %s", exc)
-        return JsonResponse({"message": "Gagal membuat Snap Token."}, status=500)
+        default_message = "Gagal membuat Snap Token."
+        message, response_payload, status_code = _extract_midtrans_error(exc, default_message)
+        log_extra = {"order_number": getattr(order, "order_number", None)}
+        if response_payload:
+            log_extra["midtrans_response"] = response_payload
+        logger.exception("Failed to create order or Snap transaction: %s", exc, extra=log_extra)
+        http_status = status_code if isinstance(status_code, int) and 400 <= status_code < 600 else 500
+        return JsonResponse({"message": message or default_message}, status=http_status)
 
     request.session["midtrans_order_id"] = order.order_number
     request.session.pop("checkout", None)
@@ -604,6 +832,8 @@ def payment_create_doku_checkout(request):
                 notes=notes,
                 shipping_address_obj=shipping_address,
                 shipping_service_name=service_label,
+                payment_method_slug=selected_payment_slug,
+                payment_method_display=(payment_method_obj.name if payment_method_obj else selected_payment_slug),
             )
 
             status_code, response_data, _ = _call_doku_api("/checkout/v1/payment", payload)
@@ -637,6 +867,160 @@ def payment_create_doku_checkout(request):
     return JsonResponse({"payment_url": payment_url, "order_id": order.order_number})
 
 
+@login_required
+@require_POST
+def payment_create_order_snap_token(request, order_number):
+    """Create a Midtrans Snap token for an existing pending order."""
+
+    try:
+        snap_client = _build_midtrans_client()
+    except RuntimeError as exc:
+        logger.exception("Midtrans configuration error: %s", exc)
+        return JsonResponse({"message": str(exc)}, status=500)
+
+    order = (
+        Order.objects.filter(order_number=order_number, user=request.user)
+        .select_related("shipping_address")
+        .prefetch_related("items")
+        .first()
+    )
+
+    if order is None:
+        return JsonResponse({"message": "Pesanan tidak ditemukan."}, status=404)
+
+    if cancel_order_due_to_timeout(order):
+        return JsonResponse({"message": "Batas waktu pembayaran telah berakhir."}, status=400)
+
+    if order.status != "pending":
+        return JsonResponse({"message": "Pesanan tidak dapat dibayar."}, status=400)
+
+    midtrans_slug = getattr(settings, "MIDTRANS_PAYMENT_METHOD_SLUG", "midtrans")
+    if (order.payment_method or "").lower() != (midtrans_slug or "").lower():
+        return JsonResponse({"message": "Metode pembayaran pesanan tidak menggunakan Midtrans."}, status=400)
+
+    midtrans_order_id = order.ensure_midtrans_order_id()
+
+    transaction_payload = {
+        "transaction_details": {
+            "order_id": midtrans_order_id,
+            "gross_amount": _to_int_amount(order.total),
+        },
+        "item_details": _build_order_payment_item_details(order),
+        "customer_details": _build_order_customer_details(order),
+        "credit_card": {"secure": True},
+        "callbacks": {
+            "finish": request.build_absolute_uri(reverse("payment:finish")),
+        },
+        "custom_field1": order.order_number,
+    }
+
+    try:
+        token, reused = get_or_create_midtrans_snap_token(
+            order=order,
+            snap_client=snap_client,
+            transaction_payload=transaction_payload,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        default_message = "Gagal membuat token pembayaran."
+        message, response_payload, status_code = _extract_midtrans_error(exc, default_message)
+        log_extra = {"order_number": order.order_number, "midtrans_order_id": order.midtrans_order_id}
+        if response_payload:
+            log_extra["midtrans_response"] = response_payload
+        logger.exception(
+            "Failed to create Midtrans transaction for order %s: %s",
+            order.order_number,
+            exc,
+            extra=log_extra,
+        )
+        http_status = status_code if isinstance(status_code, int) and 400 <= status_code < 600 else 500
+        return JsonResponse({"message": message or default_message}, status=http_status)
+
+    return JsonResponse({"token": token, "order_id": order.order_number, "reused": reused})
+
+
+@login_required
+@require_POST
+def payment_create_order_doku_checkout(request, order_number):
+    """Create a DOKU payment session for an existing pending order."""
+
+    config = _get_doku_config()
+    if not config.get("client_id") or not config.get("secret_key"):
+        return JsonResponse({"message": "Konfigurasi DOKU belum lengkap."}, status=500)
+
+    order = (
+        Order.objects.filter(order_number=order_number, user=request.user)
+        .select_related("shipping_address")
+        .prefetch_related("items")
+        .first()
+    )
+
+    if order is None:
+        return JsonResponse({"message": "Pesanan tidak ditemukan."}, status=404)
+
+    if cancel_order_due_to_timeout(order):
+        return JsonResponse({"message": "Batas waktu pembayaran telah berakhir."}, status=400)
+
+    if order.status != "pending":
+        return JsonResponse({"message": "Pesanan tidak dapat dibayar."}, status=400)
+
+    doku_slug = getattr(settings, "DOKU_PAYMENT_METHOD_SLUG", "doku")
+    if (order.payment_method or "").lower() != (doku_slug or "").lower():
+        return JsonResponse({"message": "Metode pembayaran pesanan tidak menggunakan DOKU."}, status=400)
+
+    line_items = _build_doku_line_items_from_order(order)
+    order_payload = {
+        "amount": _to_int_amount(order.total),
+        "invoice_number": order.order_number,
+        "currency": "IDR",
+        "callback_url": request.build_absolute_uri(reverse("payment:doku_notification")),
+        "return_url": request.build_absolute_uri(reverse("payment:doku_return")),
+    }
+    if config.get("merchant_code"):
+        order_payload["merchant_code"] = config["merchant_code"]
+    if line_items:
+        order_payload["line_items"] = line_items
+
+    customer_payload = _build_order_customer_payload(order)
+    service_label = order.selected_service_name or (
+        "Express" if str(order.selected_courier or "").upper() == "EXP" else "Reguler"
+    )
+
+    payload = {
+        "order": order_payload,
+        "payment": {"payment_due_date": 60},
+        "customer": customer_payload,
+        "additional_info": {
+            "notes": order.notes,
+            "shipping_service": service_label,
+            "discount_code": "",
+        },
+    }
+
+    try:
+        status_code, response_data, _ = _call_doku_api("/checkout/v1/payment", payload)
+    except RuntimeError as exc:
+        logger.exception("Failed to call DOKU API for order %s: %s", order.order_number, exc)
+        return JsonResponse({"message": str(exc)}, status=500)
+
+    if not (200 <= status_code < 300):
+        message = response_data.get("message") or response_data.get("error")
+        logger.error("DOKU retry checkout failed for %s: %s", order.order_number, response_data)
+        return JsonResponse({"message": message or "Gagal membuat sesi pembayaran DOKU."}, status=500)
+
+    payment_url = (
+        response_data.get("payment_url")
+        or response_data.get("redirect_url")
+        or response_data.get("checkout_url")
+        or response_data.get("response", {}).get("payment", {}).get("url")
+        or response_data.get("response", {}).get("payment", {}).get("payment_url")
+    )
+
+    if not payment_url:
+        return JsonResponse({"message": "URL pembayaran DOKU tidak tersedia."}, status=500)
+
+    return JsonResponse({"payment_url": payment_url, "order_id": order.order_number})
+
+
 @csrf_exempt
 @login_required
 @require_POST
@@ -648,7 +1032,8 @@ def payment_finish(request):
         return JsonResponse({"message": "Payload tidak valid."}, status=400)
 
     result = payload.get("result") or payload
-    order_id = result.get("order_id")
+    raw_order_id = result.get("order_id")
+    order_id = _extract_order_number_from_midtrans(raw_order_id)
     transaction_status = result.get("transaction_status") or result.get("status")
 
     if not order_id:
@@ -662,7 +1047,11 @@ def payment_finish(request):
 
         if transaction_status in success_states and order.status != "paid":
             order.status = "paid"
-            order.save(update_fields=["status"])
+            update_fields = ["status"]
+            if order.midtrans_token:
+                order.midtrans_token = ""
+                update_fields.append("midtrans_token")
+            order.save(update_fields=update_fields)
         elif transaction_status in pending_states and order.status != "pending":
             order.status = "pending"
             order.save(update_fields=["status"])
@@ -670,12 +1059,18 @@ def payment_finish(request):
             with transaction.atomic():
                 restore_order_stock(order)
                 order.status = "cancelled"
-                order.save(update_fields=["status"])
+                update_fields = ["status"]
+                if order.midtrans_token:
+                    order.midtrans_token = ""
+                    update_fields.append("midtrans_token")
+                order.save(update_fields=update_fields)
 
     request.session["midtrans_last_result"] = result
     request.session.modified = True
 
     response_payload = {"message": "Status pembayaran diterima.", "order_id": order_id}
+    if raw_order_id and raw_order_id != order_id:
+        response_payload["gateway_order_id"] = raw_order_id
     if order:
         response_payload["status"] = order.status
 
@@ -693,11 +1088,12 @@ def doku_notification(request):
         return JsonResponse({"message": "Payload tidak valid."}, status=400)
 
     order_info = payload.get("order") or {}
-    order_id = (
+    raw_order_id = (
         order_info.get("invoice_number")
         or order_info.get("order_id")
         or payload.get("order_id")
     )
+    order_id = _extract_order_number_from_midtrans(raw_order_id)
     status_info = payload.get("transaction") or payload.get("payment") or {}
     transaction_status = (
         status_info.get("status")
@@ -734,6 +1130,8 @@ def doku_notification(request):
     request.session.modified = True
 
     response_payload = {"message": "Status pembayaran DOKU diterima.", "order_id": order_id}
+    if raw_order_id and raw_order_id != order_id:
+        response_payload["gateway_order_id"] = raw_order_id
     if order:
         response_payload["status"] = order.status
 

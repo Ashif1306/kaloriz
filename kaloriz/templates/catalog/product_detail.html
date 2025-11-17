@@ -5,6 +5,53 @@
 
 {% block content %}
 <style>
+  .product-detail-image-card {
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .product-detail-image-card .wishlist-icon {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 2;
+  }
+
+  .wishlist-btn {
+    background: #ffffff;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+  }
+
+  .wishlist-btn:hover {
+    background: rgba(220, 34, 32, 0.12);
+    transform: scale(1.05);
+  }
+
+  .wishlist-btn .fa-heart {
+    font-size: 1.15rem;
+    color: #cbd5f5;
+    transition: color 0.3s ease;
+  }
+
+  .wishlist-btn.is-active {
+    background: rgba(220, 34, 32, 0.12);
+  }
+
+  .wishlist-btn.is-active .fa-heart,
+  .wishlist-btn:hover .fa-heart {
+    color: #dc2220;
+  }
+
   .info-card {
     background: #ffffff;
     border-radius: 18px;
@@ -199,7 +246,22 @@
   <div class="row">
     <!-- Product Image -->
     <div class="col-md-5">
-      <div class="card shadow">
+      <div class="card shadow product-detail-image-card">
+        <div class="wishlist-icon">
+          <button
+            type="button"
+            class="wishlist-btn js-watchlist-toggle {% if is_product_watchlisted %}is-active{% endif %}"
+            data-toggle-url="{% url 'core:toggle_watchlist' product.id %}"
+            data-login-url="{% url 'core:login' %}?next={{ request.get_full_path|urlencode }}"
+            data-is-auth="{% if user.is_authenticated %}true{% else %}false{% endif %}"
+            data-watchlisted="{% if is_product_watchlisted %}true{% else %}false{% endif %}"
+            aria-pressed="{% if is_product_watchlisted %}true{% else %}false{% endif %}"
+            aria-label="{% if is_product_watchlisted %}Hapus dari watchlist{% else %}Tambah ke watchlist{% endif %}"
+            title="{% if is_product_watchlisted %}Hapus dari watchlist{% else %}Tambah ke watchlist{% endif %}"
+          >
+            <i class="{% if is_product_watchlisted %}fa-solid{% else %}fa-regular{% endif %} fa-heart"></i>
+          </button>
+        </div>
         {% if product.image %}
           <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
         {% else %}

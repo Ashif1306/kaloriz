@@ -11,16 +11,15 @@
     <div class="col-lg-8">
       <div class="card shadow-sm">
         <div class="card-body">
-          <div class="table-responsive">
-            <table class="table align-middle">
+          <div class="table-responsive cart-table-wrapper">
+            <table class="table align-middle cart-table">
               <thead>
                 <tr>
                   <th width="36"><input type="checkbox" id="check-all" title="Pilih semua"></th>
-                  <th>Produk</th>
+                  <th class="product-head">Produk</th>
                   <th width="120">Harga</th>
-                  <th width="160">Jumlah</th>
+                  <th width="170">Jumlah</th>
                   <th width="140">Subtotal</th>
-                  <th width="64">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -29,50 +28,46 @@
                     data-item-id="{{ item.id }}"
                     data-price="{{ item.product.get_display_price }}"> {# ANGKA DARI DB #}
 
-                  <td>
+                  <td class="select-col" data-label="Pilih">
                     <input type="checkbox" class="item-check" {% if item.is_selected %}checked{% endif %}>
                   </td>
 
-                  <td>
-                  <div class="product-cell">
-                    {% if item.product.image %}
-                      <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}">
-                    {% endif %}
-                    <div class="product-info">
-                      <a href="{% url 'catalog:product_detail' item.product.slug %}">
-                        {{ item.product.name }}
-                      </a>
-                      <small class="text-muted">{{ item.product.category.name }}</small>
+                  <td class="product-col" data-label="Produk">
+                    <div class="product-cell">
+                      {% if item.product.image %}
+                        <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}">
+                      {% endif %}
+                      <div class="product-info">
+                        <a href="{% url 'catalog:product_detail' item.product.slug %}">
+                          {{ item.product.name }}
+                        </a>
+                        <small class="text-muted d-block">{{ item.product.category.name }}</small>
+                      </div>
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                  <td class="price-cell">Rp {{ item.product.get_display_price|floatformat:0 }}</td>
+                  <td class="price-cell" data-label="Harga">Rp {{ item.product.get_display_price|floatformat:0 }}</td>
 
-                  <td>
-                    <form method="post" action="{% url 'core:update_cart_item' item.id %}" class="qty-form d-flex">
+                  <td class="qty-col" data-label="Jumlah">
+                    <form method="post" action="{% url 'core:update_cart_item' item.id %}" class="qty-form">
                       {% csrf_token %}
-                      <input type="number" name="quantity" class="form-control form-control-sm qty-input"
-                             min="1" max="{{ item.product.stock }}" value="{{ item.quantity }}">
-                      <button type="submit" class="btn btn-sm btn-primary ms-2" title="Simpan">
-                        <i class="fas fa-check"></i>
-                      </button>
+                      <div class="qty-control">
+                        <button type="button" class="qty-btn" data-step="-1" aria-label="Kurangi jumlah">
+                          <i class="fas fa-minus"></i>
+                        </button>
+                        <input type="number" name="quantity" class="qty-input"
+                               min="1" max="{{ item.product.stock }}" value="{{ item.quantity }}" readonly>
+                        <button type="button" class="qty-btn" data-step="1" aria-label="Tambah jumlah">
+                          <i class="fas fa-plus"></i>
+                        </button>
+                      </div>
                     </form>
                   </td>
 
-                  <td class="line-subtotal">
+                  <td class="line-subtotal" data-label="Subtotal">
                     <strong><span class="line-subtotal-text">Rp {{ item.get_subtotal|floatformat:0 }}</span></strong>
                   </td>
-                  
-                  <td>
-                    <form method="post" action="{% url 'core:remove_from_cart' item.id %}" class="d-inline">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus item ini?')" title="Hapus">
-                        <i class="fas fa-trash"></i>
-                      </button>
-                    </form>
-                  </td>
-                  
+
 
                 </tr>
 
@@ -81,7 +76,7 @@
             </table>
           </div>
 
-          <div class="d-flex justify-content-between align-items-center mt-3">
+          <div class="cart-action-row d-flex justify-content-between align-items-center mt-3 flex-wrap">
             <button type="button" id="btn-delete-selected" class="btn btn-outline-danger" disabled>
               <i class="fas fa-trash-alt"></i> Hapus Dipilih
             </button>
@@ -139,73 +134,230 @@
 </div>
 
 <style>
-  .cart-row.selected { background:#f8f9fa; transition:background .15s }
-  .item-check, #check-all { width:20px; height:20px; cursor:pointer }
-</style>
-<style>
+  :root {
+    --cart-border: #e6e9ef;
+  }
+
+  .cart-table-wrapper {
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+
+  .cart-table {
+    min-width: 100%;
+  }
+
+  .cart-table thead th {
+    background: #f7f8fb;
+    border-bottom: none;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
   .cart-row.selected { background:#f8f9fa; transition:background .15s; }
   .item-check, #check-all { width:20px; height:20px; cursor:pointer; }
 
-  /* ========== RESPONSIVE PRODUCT CELL ========== */
+  .product-col { width:45%; }
+  .product-head { width:45%; }
+  .select-col { width:50px; text-align:center; }
+
   .product-cell {
     display: flex;
     align-items: flex-start;
-    gap: 1rem; /* Jarak antara gambar dan teks */
+    gap: 1rem;
   }
 
   .product-cell img {
-    width: 70px;
-    height: 70px;
-    border-radius: 8px;
+    width: 80px;
+    height: 80px;
+    border-radius: 0.75rem;
     object-fit: cover;
     flex-shrink: 0;
+    background: #f2f4f8;
   }
 
   .product-info {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    gap: .15rem;
   }
 
   .product-info a {
-    color: #007bff;
+    color: #0d6efd;
     text-decoration: none;
     font-weight: 600;
   }
 
-  .product-info a:hover {
-    text-decoration: underline;
+  .product-info a:hover { text-decoration: underline; }
+
+  .price-cell,
+  .line-subtotal { font-weight: 600; }
+
+  .qty-form { width: 100%; }
+
+  .qty-control {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--cart-border);
+    border-radius: 999px;
+    overflow: hidden;
+    background: #fff;
   }
 
-  /* Responsif untuk tablet */
+  .qty-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: transparent;
+    color: #0d6efd;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+  }
+
+  .qty-btn:hover { background: rgba(13, 110, 253, 0.08); }
+
+  .qty-input {
+    width: 52px;
+    text-align: center;
+    border: none;
+    font-weight: 600;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .qty-input:focus { outline: none; box-shadow: none; }
+
+  .cart-action-row {
+    gap: 1rem;
+  }
+
+  /* ===== Mobile friendly table ===== */
   @media (max-width: 992px) {
-    .product-cell {
-      gap: 0.8rem;
+    .product-col,
+    .product-head { width: 55%; }
+  }
+
+  @media (max-width: 768px) {
+    .cart-table thead { display: none; }
+    .cart-table { display: block; }
+    .cart-table tbody { display: block; }
+    .cart-table tbody tr {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem 1rem;
+      align-items: center;
+      border-bottom: 1px solid var(--cart-border);
+      padding: 1rem 0;
+      margin: 0;
+      border-radius: 0;
+      box-shadow: none;
     }
+    .cart-table tbody tr:first-child { padding-top: 0; }
+    .cart-table tbody tr:last-child { border-bottom: none; padding-bottom: 0; }
+    .cart-table tbody td {
+      border: none;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      font-size: .95rem;
+    }
+    .cart-table tbody td::before { display: none; }
+
+    .select-col {
+      order: 0;
+      margin-right: .5rem;
+      width: auto;
+    }
+
+    .product-col {
+      order: 1;
+      flex: 1 1 calc(100% - 50px);
+    }
+
+    .product-cell {
+      flex-direction: row;
+      align-items: center;
+      gap: .75rem;
+    }
+
     .product-cell img {
-      width: 60px;
-      height: 60px;
+      width: 64px;
+      height: 64px;
+      border-radius: .75rem;
+    }
+
+    .product-info {
+      flex: 1;
+      gap: .2rem;
+    }
+
+    .product-info small {
+      font-size: .8rem;
+    }
+
+    .price-cell,
+    .qty-col,
+    .line-subtotal {
+      order: 2;
+      flex: 0 0 auto;
+      font-size: .9rem;
+    }
+
+    .price-cell {
+      margin-right: .5rem;
+      white-space: nowrap;
+      color: #4b5563;
+      display: flex;
+      align-items: center;
+    }
+
+    .qty-col {
+      order: 2;
+      flex: 0 1 auto;
+      margin-left: auto;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .qty-form { width: auto; }
+    .qty-control { width: auto; max-width: none; margin-left: 0; margin-right: 0; }
+
+    .line-subtotal {
+      order: 4;
+      margin-left: auto;
+      justify-content: flex-end;
+      text-align: right;
+      font-size: 1rem;
+    }
+
+    .cart-action-row {
+      justify-content: flex-start;
     }
   }
 
-  /* Responsif untuk mobile */
   @media (max-width: 576px) {
-    .table {
-      font-size: 14px;
+    .cart-table tbody tr {
+      gap: .5rem;
     }
-    .product-cell {
+    .product-col { flex-basis: calc(100% - 40px); }
+    .product-cell { align-items: flex-start; }
+    .product-info { text-align: left; }
+    .price-cell { flex: 1 1 auto; }
+    .qty-col { flex: 0 0 auto; }
+    .line-subtotal { width: 100%; justify-content: flex-start; text-align: left; }
+    .cart-action-row {
       flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 0.5rem;
+      align-items: stretch;
+      gap: .75rem;
     }
-    .product-cell img {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 0.3rem;
-    }
-    .product-info {
-      align-items: center;
+    .cart-action-row .btn {
+      width: 100%;
+      font-size: .9rem;
+      padding: .55rem .75rem;
     }
   }
 </style>
@@ -262,19 +414,37 @@
     }
   }
 
-  // Qty berubah -> hitung ulang (opsional submit form untuk persist)
-  document.addEventListener('input', e=>{
-    if (!e.target.classList.contains('qty-input')) return;
-    if (+e.target.value < 1) e.target.value = 1;
-    recompute();
-  });
+  function submitQtyForm(form){
+    if (!form || form.dataset.loading === '1') return;
+    form.dataset.loading = '1';
+    const fd = new FormData(form);
+    fetch(form.action, {
+      method:'POST',
+      headers:{'X-CSRFToken':csrf()},
+      body:fd
+    }).finally(()=>{ form.dataset.loading = '0'; });
+  }
 
-  // Enter pada qty -> submit form update qty (server akan validasi stok)
-  document.addEventListener('keydown', e=>{
-    if (e.target.classList.contains('qty-input') && e.key === 'Enter'){
-      e.preventDefault();
-      e.target.closest('.qty-form').submit();
-    }
+  function changeQty(form, delta){
+    const input = form.querySelector('.qty-input');
+    if (!input) return;
+    const max = parseInt(input.getAttribute('max'), 10) || Infinity;
+    let qty = parseInt(input.value, 10) || 1;
+    qty = qty + delta;
+    if (qty < 1) qty = 1;
+    if (qty > max) qty = max;
+    if (qty === parseInt(input.value, 10)) return;
+    input.value = qty;
+    recompute();
+    submitQtyForm(form);
+  }
+
+  document.addEventListener('click', e=>{
+    const btn = e.target.closest('.qty-btn');
+    if (!btn) return;
+    const form = btn.closest('.qty-form');
+    const delta = parseInt(btn.dataset.step, 10) || 0;
+    changeQty(form, delta);
   });
 
   // Centang per-item / pilih semua

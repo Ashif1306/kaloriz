@@ -27,7 +27,7 @@ from .models import (
 from catalog.models import Product, DiscountCode, Testimonial
 from .forms import CustomUserRegistrationForm, TestimonialForm
 from .utils import send_verification_email, send_welcome_email
-from .services.orders import create_order_from_checkout
+from .services.orders import create_order_from_checkout, cancel_order_due_to_timeout
 from shipping.models import District, Address
 from shipping.views import calculate_shipping_cost, validate_shipping_data
 from shipping.forms import AddressForm
@@ -757,7 +757,15 @@ def place_order_from_address(request):
 def order_list(request):
     """List user's orders"""
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    orders = Order.objects.filter(user=request.user).order_by('-created_at')
+    orders_qs = Order.objects.filter(user=request.user).order_by('-created_at')
+    orders = list(orders_qs)
+    expired_orders = [order for order in orders if order.status == 'pending' and order.is_payment_overdue()]
+
+    if expired_orders:
+        for order in expired_orders:
+            cancel_order_due_to_timeout(order)
+        orders = list(Order.objects.filter(user=request.user).order_by('-created_at'))
+
     context = {
         'profile': profile,
         'orders': orders,
@@ -770,10 +778,13 @@ def order_list(request):
 def order_detail(request, order_number):
     """Order detail page"""
     order = get_object_or_404(
-        Order.objects.prefetch_related('items__product'),
+        Order.objects.select_related('shipping_address').prefetch_related('items__product'),
         order_number=order_number,
         user=request.user,
     )
+
+    if cancel_order_due_to_timeout(order):
+        order.refresh_from_db()
 
     order_items = list(order.items.all())
     product_ids = [item.product_id for item in order_items if item.product_id]
@@ -787,11 +798,27 @@ def order_detail(request, order_number):
     for item in order_items:
         item.existing_testimonial = testimonials_map.get(item.product_id)
 
+    payment_is_pending = order.status == 'pending' and bool(order.payment_method)
+    payment_is_active = payment_is_pending and not order.is_payment_overdue()
+    midtrans_payment_slug = getattr(settings, 'MIDTRANS_PAYMENT_METHOD_SLUG', 'midtrans')
+    doku_payment_slug = getattr(settings, 'DOKU_PAYMENT_METHOD_SLUG', 'doku')
+
     context = {
         'order': order,
         'order_items': order_items,
         'order_can_review': order.status == 'delivered',
         'testimonial_form': TestimonialForm(),
+        'show_payment_button': payment_is_active,
+        'midtrans_payment_slug': midtrans_payment_slug,
+        'doku_payment_slug': doku_payment_slug,
+        'payment_finish_url': reverse('payment:finish'),
+        'payment_order_midtrans_token_url': reverse(
+            'payment:order_create_snap_token', args=[order.order_number]
+        ),
+        'payment_order_doku_checkout_url': reverse(
+            'payment:order_create_doku_checkout', args=[order.order_number]
+        ),
+        'MIDTRANS_CLIENT_KEY': settings.MIDTRANS_CLIENT_KEY,
     }
     return render(request, 'core/order_detail.html', context)
 
@@ -1242,6 +1269,40 @@ def remove_from_watchlist(request, watchlist_id):
     watchlist_item.delete()
     messages.success(request, f'{product_name} berhasil dihapus dari watchlist.')
     return redirect('core:watchlist')
+
+
+@login_required
+@require_POST
+def toggle_watchlist(request, product_id):
+    """Toggle the watchlist state for a given product."""
+    product = get_object_or_404(Product, id=product_id)
+    watchlist_item, created = Watchlist.objects.get_or_create(
+        user=request.user,
+        product=product
+    )
+
+    if created:
+        added = True
+        message_text = f'{product.name} berhasil ditambahkan ke watchlist.'
+    else:
+        watchlist_item.delete()
+        added = False
+        message_text = f'{product.name} dihapus dari watchlist.'
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'added': added,
+            'message': message_text,
+        })
+
+    if added:
+        messages.success(request, message_text)
+    else:
+        messages.info(request, message_text)
+
+    return redirect(request.META.get('HTTP_REFERER', product.get_absolute_url()))
+
 
 @login_required
 @require_POST

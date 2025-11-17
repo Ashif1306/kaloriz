@@ -10,4 +10,14 @@ urlpatterns = [
     path("doku/create-checkout/", views.payment_create_doku_checkout, name="create_doku_checkout"),
     path("doku/notification/", views.doku_notification, name="doku_notification"),
     path("doku/return/", views.doku_return, name="doku_return"),
+    path(
+        "orders/<str:order_number>/midtrans-token/",
+        views.payment_create_order_snap_token,
+        name="order_create_snap_token",
+    ),
+    path(
+        "orders/<str:order_number>/doku-checkout/",
+        views.payment_create_order_doku_checkout,
+        name="order_create_doku_checkout",
+    ),
 ]

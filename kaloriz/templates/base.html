@@ -20,7 +20,7 @@
   {% block extra_head %}{% endblock %}
 </head>
 
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <!-- Modern Minimalist Navbar -->
   {% block navbar %}
   <nav class="modern-navbar">
@@ -135,6 +135,10 @@
   <style>
   :root {
     --header-h: 72px;
+  }
+
+  body.no-navbar-offset {
+    --header-h: 0px;
   }
 
   main {
@@ -765,6 +769,90 @@
     document.addEventListener('DOMContentLoaded', attachCartFormHandlers);
   } else {
     attachCartFormHandlers();
+  }
+
+  function setWatchlistButtonState(button, isActive) {
+    if (!button) {
+      return;
+    }
+
+    button.classList.toggle('is-active', Boolean(isActive));
+    button.dataset.watchlisted = isActive ? 'true' : 'false';
+    const labelText = isActive ? 'Hapus dari watchlist' : 'Tambah ke watchlist';
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    button.setAttribute('aria-label', labelText);
+    button.title = labelText;
+
+    const icon = button.querySelector('.fa-heart');
+    if (icon) {
+      icon.classList.toggle('fa-solid', Boolean(isActive));
+      icon.classList.toggle('fa-regular', !isActive);
+    }
+  }
+
+  function attachWatchlistHandlers() {
+    const buttons = document.querySelectorAll('.js-watchlist-toggle');
+    buttons.forEach((button) => {
+      if (button.dataset.watchlistBound === 'true') {
+        return;
+      }
+
+      button.dataset.watchlistBound = 'true';
+
+      button.addEventListener('click', (event) => {
+        if (event && typeof event.stopPropagation === 'function') {
+          event.stopPropagation();
+          event.preventDefault();
+        }
+
+        const isAuthenticated = button.dataset.isAuth === 'true';
+        if (!isAuthenticated) {
+          const loginUrl = button.dataset.loginUrl || '/login/';
+          window.location.href = loginUrl;
+          return;
+        }
+
+        const toggleUrl = button.dataset.toggleUrl;
+        if (!toggleUrl || button.disabled) {
+          return;
+        }
+
+        button.disabled = true;
+        const formData = new FormData();
+
+        fetch(toggleUrl, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': getCookie('csrftoken') || ''
+          },
+          body: formData
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data || data.success !== true) {
+              const message = (data && data.message) || 'Gagal memperbarui watchlist.';
+              showToast(message, 'error');
+              return;
+            }
+
+            setWatchlistButtonState(button, data.added);
+            showToast(data.message || 'Watchlist diperbarui.', 'success');
+          })
+          .catch(() => {
+            showToast('Terjadi kesalahan jaringan. Silakan coba lagi.', 'error');
+          })
+          .finally(() => {
+            button.disabled = false;
+          });
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachWatchlistHandlers);
+  } else {
+    attachWatchlistHandlers();
   }
 
   document.addEventListener('DOMContentLoaded', () => {

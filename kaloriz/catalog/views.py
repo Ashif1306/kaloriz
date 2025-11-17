@@ -90,10 +90,14 @@ def product_detail(request, slug):
         is_approved=True
     ).select_related('user')[:10]
 
+    watchlisted_ids = _get_watchlisted_product_ids(request)
+
     context = {
         'product': product,
         'related_products': related_products,
         'testimonials': testimonials,
+        'watchlisted_product_ids': watchlisted_ids,
+        'is_product_watchlisted': product.id in watchlisted_ids,
     }
     return render(request, 'catalog/product_detail.html', context)
 

@@ -1,4 +1,5 @@
-from django.urls import path
+from django.contrib.auth import views as auth_views
+from django.urls import path, reverse_lazy
 from . import views
 
 app_name = 'core'
@@ -32,6 +33,40 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
 
+    # Password reset URLs
+    path(
+        'password-reset/',
+        auth_views.PasswordResetView.as_view(
+            template_name='core/password_reset_form.html',
+            email_template_name='core/emails/password_reset_email.txt',
+            subject_template_name='core/emails/password_reset_subject.txt',
+            success_url=reverse_lazy('core:password_reset_done'),
+        ),
+        name='password_reset',
+    ),
+    path(
+        'password-reset/done/',
+        auth_views.PasswordResetDoneView.as_view(
+            template_name='core/password_reset_done.html'
+        ),
+        name='password_reset_done',
+    ),
+    path(
+        'reset/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name='core/password_reset_confirm.html',
+            success_url=reverse_lazy('core:password_reset_complete'),
+        ),
+        name='password_reset_confirm',
+    ),
+    path(
+        'reset/done/',
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name='core/password_reset_complete.html'
+        ),
+        name='password_reset_complete',
+    ),
+
     # Profile URLs
     path('profile/', views.profile_view, name='profile'),
     path('profile/settings/', views.profile_settings, name='profile_settings'),
@@ -43,5 +78,6 @@ urlpatterns = [
     path('watchlist/', views.watchlist_view, name='watchlist'),
     path('watchlist/add/<int:product_id>/', views.add_to_watchlist, name='add_to_watchlist'),
     path('watchlist/remove/<int:watchlist_id>/', views.remove_from_watchlist, name='remove_from_watchlist'),
+    path('watchlist/toggle/<int:product_id>/', views.toggle_watchlist, name='toggle_watchlist'),
     
 ]

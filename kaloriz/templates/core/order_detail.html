@@ -1,4 +1,186 @@
 {% extends 'base.html' %}
+{% load price_filters %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+  .order-items-card .table {
+    margin-bottom: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .order-items-card .table-responsive {
+    overflow-x: visible;
+  }
+
+  .order-items-card .table thead th {
+    border-top: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+  }
+
+  .order-items-card .product-col {
+    width: 32%;
+    min-width: 220px;
+  }
+
+  .order-items-card .product-info {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .order-items-card .product-thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    flex-shrink: 0;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+  }
+
+  .order-items-card .product-thumb.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-size: 1.25rem;
+    border-style: dashed;
+  }
+
+  .order-items-card .price-col,
+  .order-items-card .qty-col,
+  .order-items-card .subtotal-col,
+  .order-items-card .rating-col {
+    width: 17%;
+    min-width: 100px;
+  }
+
+  .order-items-card .subtotal-col {
+    white-space: nowrap;
+  }
+
+  .order-items-card .rating-col {
+    text-align: center;
+  }
+
+  .order-items-card .rating-text {
+    display: inline-block;
+    line-height: 1.2;
+  }
+
+  .order-summary {
+    border-top: 1px solid #e9ecef;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+  }
+
+  .order-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .order-summary-row:last-child {
+    margin-bottom: 0;
+    font-size: 1.05rem;
+  }
+
+  .order-summary-row strong {
+    font-weight: 600;
+  }
+
+  @media (max-width: 767.98px) {
+    .order-items-card .table {
+      table-layout: auto;
+    }
+
+    .order-items-card .table thead {
+      display: none;
+    }
+
+    .order-items-card .table tbody tr {
+      display: block;
+      padding: 1rem 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .order-items-card .table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .order-items-card .table tbody td {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.25rem 0;
+      border-top: none;
+      text-align: right;
+    }
+
+    .order-items-card .table tbody td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      color: #6c757d;
+      text-align: left;
+      flex: 0 0 45%;
+      letter-spacing: 0.02em;
+    }
+
+    .order-items-card .product-col,
+    .order-items-card .price-col,
+    .order-items-card .qty-col,
+    .order-items-card .subtotal-col,
+    .order-items-card .rating-col {
+      width: 100%;
+      min-width: auto;
+    }
+
+    .order-items-card .product-info {
+      flex-direction: row;
+      align-items: flex-start;
+    }
+
+    .order-items-card .product-thumb {
+      width: 56px;
+      height: 56px;
+    }
+
+    .order-items-card .product-details {
+      text-align: left;
+    }
+
+    .order-items-card .table tbody td.product-col {
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+      gap: 0.5rem;
+    }
+
+    .order-items-card .table tbody td.product-col::before {
+      flex-basis: auto;
+      width: 100%;
+    }
+
+    .order-items-card .rating-text {
+      text-align: right;
+    }
+
+    .order-summary-row {
+      font-size: 1rem;
+    }
+  }
+</style>
+{% endblock %}
 
 {% block title %}Pesanan {{ order.order_number }} - Kaloriz{% endblock %}
 
@@ -13,113 +195,88 @@
       <span class="badge badge-{{ order.get_status_display_class }} badge-lg p-3">
         {{ order.get_status_display }}
       </span>
+      {% if show_payment_button %}
+      <div class="mt-3">
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          id="order-pay-button"
+          data-payment-method="{{ order.payment_method|lower }}"
+        >
+          <i class="fas fa-wallet mr-1"></i> Bayar di sini
+        </button>
+        {% if order.payment_deadline %}
+        <p class="text-muted small mb-0 mt-2">Batas bayar: {{ order.payment_deadline|date:"d M Y H:i" }}</p>
+        {% endif %}
+      </div>
+      {% elif order.status == 'cancelled' and order.payment_deadline %}
+      <p class="text-muted small mt-3 mb-0">Pesanan dibatalkan pada {{ order.payment_deadline|date:"d M Y H:i" }}.</p>
+      {% endif %}
     </div>
   </div>
 
   <div class="row">
     <div class="col-md-8">
       <!-- Order Items -->
-      <div class="card shadow mb-4">
+      <div class="card shadow mb-4 order-items-card">
         <div class="card-header bg-primary text-white">
           <h5 class="mb-0">Item Pesanan</h5>
         </div>
         <div class="card-body">
-          <table class="table">
+          <div class="table-responsive">
+          <table class="table align-middle">
             <thead>
               <tr>
-                <th>Produk</th>
-                <th>Harga</th>
-                <th>Jumlah</th>
-                <th>Subtotal</th>
-                <th>Penilaian</th>
+                <th class="product-col">Produk</th>
+                <th class="text-center price-col">Harga (Rp)</th>
+                <th class="text-center qty-col">Jumlah</th>
+                <th class="text-center subtotal-col">Subtotal (Rp)</th>
+                <th class="text-center rating-col">Penilaian</th>
               </tr>
             </thead>
             <tbody>
               {% for item in order_items %}
               <tr>
-                <td class="align-middle">
-                  <strong>{{ item.product_name }}</strong>
-                </td>
-                <td class="align-middle">Rp {{ item.product_price|floatformat:0 }}</td>
-                <td class="align-middle">{{ item.quantity }}</td>
-                <td class="align-middle"><strong>Rp {{ item.subtotal|floatformat:0 }}</strong></td>
-                <td class="align-middle">
-                  {% if item.product %}
-                    {% if item.existing_testimonial %}
-                      <span class="badge badge-success mb-2"><i class="fas fa-check"></i> Sudah Dinilai</span>
-                      <div class="mb-1 text-warning font-weight-bold">
-                        <i class="fas fa-star"></i> {{ item.existing_testimonial.rating }} / 5
-                      </div>
-                      <p class="small mb-0 text-muted">"{{ item.existing_testimonial.review }}"</p>
-                    {% elif order_can_review %}
-                      <button class="btn btn-outline-primary btn-sm" type="button" data-toggle="modal" data-target="#reviewModal{{ item.id }}">
-                        <i class="fas fa-star"></i> Beri Penilaian
-                      </button>
-
-                      <div class="modal fade" id="reviewModal{{ item.id }}" tabindex="-1" role="dialog" aria-labelledby="reviewModalLabel{{ item.id }}" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                          <div class="modal-content">
-                            <div class="modal-header">
-                              <h5 class="modal-title" id="reviewModalLabel{{ item.id }}">Beri Penilaian - {{ item.product_name }}</h5>
-                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                              </button>
-                            </div>
-                            <form method="post" action="{% url 'core:submit_testimonial' order.order_number item.id %}" enctype="multipart/form-data">
-                              <div class="modal-body">
-                                {% csrf_token %}
-                                <div class="form-group mb-3">
-                                  <label class="small font-weight-bold" for="rating{{ item.id }}">{{ testimonial_form.fields.rating.label }}</label>
-                                  <select id="rating{{ item.id }}" name="rating" class="custom-select custom-select-sm" required>
-                                    <option value="" disabled selected>Pilih rating</option>
-                                    {% for value, label in testimonial_form.fields.rating.choices %}
-                                    <option value="{{ value }}">{{ label }}</option>
-                                    {% endfor %}
-                                  </select>
-                                </div>
-                                <div class="form-group mb-3">
-                                  <label class="small font-weight-bold" for="review{{ item.id }}">{{ testimonial_form.fields.review.label }}</label>
-                                  <textarea id="review{{ item.id }}" name="review" class="form-control form-control-sm" rows="3" placeholder="{{ testimonial_form.fields.review.widget.attrs.placeholder }}" required></textarea>
-                                </div>
-                                <div class="form-group mb-0">
-                                  <label class="small font-weight-bold" for="photo{{ item.id }}">{{ testimonial_form.fields.photo.label }}</label>
-                                  <input id="photo{{ item.id }}" type="file" name="photo" class="form-control-file" accept="image/*">
-                                  <small class="form-text text-muted">Opsional: unggah foto pendukung (maksimal 1).</small>
-                                </div>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" data-dismiss="modal">Batal</button>
-                                <button type="submit" class="btn btn-success btn-sm">Kirim Penilaian</button>
-                              </div>
-                            </form>
-                          </div>
-                        </div>
-                      </div>
+                <td class="align-middle product-col" data-label="Produk">
+                  <div class="product-info">
+                    {% if item.product and item.product.image %}
+                      <img src="{{ item.product.image.url }}" alt="{{ item.product_name }}" class="product-thumb">
                     {% else %}
-                      <small class="text-muted">Penilaian tersedia setelah pesanan selesai.</small>
+                      <div class="product-thumb placeholder">
+                        <i class="fas fa-image" aria-hidden="true"></i>
+                        <span class="sr-only">Tidak ada gambar produk</span>
+                      </div>
                     {% endif %}
-                  {% else %}
-                    <small class="text-muted">Produk tidak tersedia.</small>
-                  {% endif %}
+                    <div class="product-details">
+                      <strong>{{ item.product_name }}</strong>
+                    </div>
+                  </div>
+                </td>
+                <td class="align-middle text-center price-col" data-label="Harga (Rp)">{{ item.product_price|dot_separator }}</td>
+                <td class="align-middle text-center qty-col" data-label="Jumlah">{{ item.quantity }}</td>
+                <td class="align-middle text-center subtotal-col" data-label="Subtotal (Rp)"><strong>{{ item.subtotal|dot_separator }}</strong></td>
+                <td class="align-middle rating-col" data-label="Penilaian">
+                  <span class="text-muted d-inline-block rating-text">Belum<br>tersedia.</span>
                 </td>
               </tr>
               {% endfor %}
             </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="4" class="text-right"><strong>Subtotal:</strong></td>
-                <td><strong>Rp {{ order.subtotal|floatformat:0 }}</strong></td>
-              </tr>
-              <tr>
-                <td colspan="4" class="text-right"><strong>Ongkir:</strong></td>
-                <td><strong>Rp {{ order.shipping_cost|floatformat:0 }}</strong></td>
-              </tr>
-              <tr class="table-success">
-                <td colspan="4" class="text-right"><strong>Total:</strong></td>
-                <td><strong>Rp {{ order.total|floatformat:0 }}</strong></td>
-              </tr>
-            </tfoot>
           </table>
+          </div>
+          <div class="order-summary">
+            <div class="order-summary-row">
+              <span class="text-muted">Subtotal</span>
+              <strong>Rp {{ order.subtotal|dot_separator }}</strong>
+            </div>
+            <div class="order-summary-row">
+              <span class="text-muted">Ongkir</span>
+              <strong>Rp {{ order.shipping_cost|dot_separator }}</strong>
+            </div>
+            <div class="order-summary-row text-success">
+              <span class="font-weight-bold">Total</span>
+              <strong>Rp {{ order.total|dot_separator }}</strong>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -161,6 +318,22 @@
             {% endif %}
           </p>
           <p><strong>No. Resi:</strong><br>{{ order.tracking_number|default:"-" }}</p>
+          <p><strong>Metode Pembayaran:</strong><br>{{ order.payment_method_display|default:order.payment_method|default:"-" }}</p>
+          {% if order.payment_deadline %}
+          <p><strong>Batas Pembayaran:</strong><br>{{ order.payment_deadline|date:"d M Y H:i" }}</p>
+          {% endif %}
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3">
+            <span class="font-weight-bold mb-2 mb-sm-0">Lacak disini</span>
+            {% if order.tracking_url %}
+              <a href="{{ order.tracking_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+                <i class="fas fa-location-arrow"></i> Lacak Pesanan
+              </a>
+            {% else %}
+              <button type="button" class="btn btn-secondary btn-sm disabled" disabled aria-disabled="true">
+                <i class="fas fa-location-arrow"></i> Lacak Pesanan
+              </button>
+            {% endif %}
+          </div>
           {% if order.notes %}
           <p><strong>Catatan:</strong><br>{{ order.notes }}</p>
           {% endif %}
@@ -174,4 +347,176 @@
     </div>
   </div>
 </div>
+{% if show_payment_button %}
+<div
+  id="order-payment-config"
+  class="d-none"
+  data-order-number="{{ order.order_number }}"
+  data-payment-method="{{ order.payment_method|lower }}"
+  data-midtrans-slug="{{ midtrans_payment_slug|lower }}"
+  data-doku-slug="{{ doku_payment_slug|lower }}"
+  data-midtrans-url="{{ payment_order_midtrans_token_url }}"
+  data-doku-url="{{ payment_order_doku_checkout_url }}"
+  data-finish-url="{{ payment_finish_url }}"
+  data-order-detail-url="{% url 'core:order_detail' order.order_number %}"
+></div>
+{% if order.payment_method|lower == midtrans_payment_slug|lower %}
+<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ MIDTRANS_CLIENT_KEY }}"></script>
+{% endif %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const paymentConfig = document.getElementById('order-payment-config');
+    const payButton = document.getElementById('order-pay-button');
+
+    if (!paymentConfig || !payButton) {
+      return;
+    }
+
+    const paymentMethod = (paymentConfig.dataset.paymentMethod || '').toLowerCase();
+    const midtransSlug = (paymentConfig.dataset.midtransSlug || '').toLowerCase();
+    const dokuSlug = (paymentConfig.dataset.dokuSlug || '').toLowerCase();
+    const finishUrl = paymentConfig.dataset.finishUrl || '';
+    const midtransUrl = paymentConfig.dataset.midtransUrl || '';
+    const dokuUrl = paymentConfig.dataset.dokuUrl || '';
+    const orderDetailUrl = paymentConfig.dataset.orderDetailUrl || window.location.href;
+
+    function showNotification(message, type = 'success') {
+      if (!message) {
+        return;
+      }
+      if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+      } else {
+        alert(message);
+      }
+    }
+
+    function toggleLoading(state) {
+      if (!payButton) {
+        return;
+      }
+      if (state) {
+        payButton.dataset.originalText = payButton.textContent;
+        payButton.textContent = 'Memproses...';
+        payButton.disabled = true;
+      } else {
+        const originalText = payButton.dataset.originalText;
+        if (originalText) {
+          payButton.textContent = originalText;
+        }
+        payButton.disabled = false;
+      }
+    }
+
+    function postFinish(status, result) {
+      if (!finishUrl) {
+        return Promise.resolve();
+      }
+      return fetch(finishUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken') || ''
+        },
+        body: JSON.stringify({ status, result })
+      }).catch((error) => {
+        console.warn('Gagal mengirim status pembayaran', error);
+      });
+    }
+
+    if (paymentMethod === midtransSlug && midtransUrl) {
+      payButton.addEventListener('click', async function handleMidtransPay() {
+        if (!window.snap) {
+          showNotification('Midtrans Snap belum siap. Muat ulang halaman dan coba lagi.', 'error');
+          return;
+        }
+
+        toggleLoading(true);
+        try {
+          const response = await fetch(midtransUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken') || ''
+            }
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Gagal membuat token pembayaran.');
+          }
+
+          const data = await response.json();
+          const token = data && data.token;
+          if (!token) {
+            throw new Error('Token pembayaran tidak tersedia.');
+          }
+
+          toggleLoading(false);
+
+          window.snap.pay(token, {
+            onSuccess(result) {
+              showNotification('Pembayaran berhasil.', 'success');
+              postFinish('success', result).finally(function () {
+                window.location.href = orderDetailUrl;
+              });
+            },
+            onPending(result) {
+              showNotification('Pembayaran sedang diproses.', 'warning');
+              postFinish('pending', result);
+            },
+            onError(result) {
+              showNotification('Terjadi kesalahan dalam pembayaran.', 'error');
+              postFinish('error', result);
+            },
+            onClose() {
+              showNotification('Anda menutup pop-up pembayaran sebelum selesai.', 'warning');
+            }
+          });
+        } catch (error) {
+          console.error(error);
+          showNotification(error.message || 'Gagal membuat token pembayaran.', 'error');
+          toggleLoading(false);
+        }
+      });
+      return;
+    }
+
+    if (paymentMethod === dokuSlug && dokuUrl) {
+      payButton.addEventListener('click', async function handleDokuPay() {
+        toggleLoading(true);
+        try {
+          const response = await fetch(dokuUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken') || ''
+            }
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error((data && data.message) || 'Gagal membuka halaman pembayaran.');
+          }
+
+          const paymentUrl = data.payment_url || data.redirect_url || data.checkout_url;
+          if (!paymentUrl) {
+            throw new Error('URL pembayaran tidak tersedia.');
+          }
+
+          window.location.href = paymentUrl;
+        } catch (error) {
+          console.error(error);
+          showNotification(error.message || 'Gagal membuka halaman pembayaran.', 'error');
+          toggleLoading(false);
+        }
+      });
+      return;
+    }
+
+    payButton.disabled = true;
+    payButton.textContent = 'Metode tidak tersedia';
+  });
+</script>
+{% endif %}
 {% endblock %}

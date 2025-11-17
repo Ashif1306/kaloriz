@@ -3,10 +3,11 @@
 
 {% block title %}Login - Kaloriz{% endblock %}
 
+{% block body_class %}no-navbar-offset{% endblock %}
+
 {% block extra_head %}
 <style>
   :root {
-    --header-h: 0px;
     --primary-color: #38b6ff;
     --primary-dark: #2196F3;
   }
@@ -15,6 +16,11 @@
   body {
     margin: 0;
     padding: 0;
+  }
+
+  /* Hide global footer */
+  footer {
+    display: none;
   }
   
   /* Auth Page Styles */
@@ -407,7 +413,7 @@
             <input type="checkbox" id="remember_me" name="remember_me" {% if remember_me %}checked{% endif %}>
             <span>Remember me</span>
           </label>
-          <a href="mailto:info@kaloriz.com?subject=Forgot%20Password" class="auth-link">Forgot password ?</a>
+          <a href="{% url 'core:password_reset' %}" class="auth-link">Forgot password ?</a>
         </div>
 
         <button type="submit" class="auth-submit">Login</button>

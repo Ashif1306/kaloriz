@@ -25,16 +25,21 @@
         {% endif %}
 
         <!-- Wishlist Icon - Top Right -->
-        {% if user.is_authenticated %}
         <div class="wishlist-icon" onclick="event.stopPropagation();">
-          <form method="post" action="{% url 'core:add_to_watchlist' product.id %}" style="display: inline;">
-            {% csrf_token %}
-            <button type="submit" class="wishlist-btn {% if product.id in watchlisted_product_ids %}is-active{% endif %}">
-              <i class="{% if product.id in watchlisted_product_ids %}fa-solid{% else %}fa-regular{% endif %} fa-heart"></i>
-            </button>
-          </form>
+          <button
+            type="button"
+            class="wishlist-btn js-watchlist-toggle {% if product.id in watchlisted_product_ids %}is-active{% endif %}"
+            data-toggle-url="{% url 'core:toggle_watchlist' product.id %}"
+            data-login-url="{% url 'core:login' %}?next={{ request.get_full_path|urlencode }}"
+            data-is-auth="{% if user.is_authenticated %}true{% else %}false{% endif %}"
+            data-watchlisted="{% if product.id in watchlisted_product_ids %}true{% else %}false{% endif %}"
+            aria-pressed="{% if product.id in watchlisted_product_ids %}true{% else %}false{% endif %}"
+            aria-label="{% if product.id in watchlisted_product_ids %}Hapus dari watchlist{% else %}Tambah ke watchlist{% endif %}"
+            title="{% if product.id in watchlisted_product_ids %}Hapus dari watchlist{% else %}Tambah ke watchlist{% endif %}"
+          >
+            <i class="{% if product.id in watchlisted_product_ids %}fa-solid{% else %}fa-regular{% endif %} fa-heart"></i>
+          </button>
         </div>
-        {% endif %}
 
         <!-- Product Image -->
         <div class="product-image-wrapper" onclick="window.location.href='{% url 'catalog:product_detail' product.slug %}'">

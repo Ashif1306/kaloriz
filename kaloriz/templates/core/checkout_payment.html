@@ -73,6 +73,9 @@
                         {% if method.tagline %}
                           <span class="tag">{{ method.tagline }}</span>
                         {% endif %}
+                        <span class="payment-status badge badge-pill {% if method.is_available %}badge-success{% else %}badge-warning text-dark{% endif %}">
+                          {{ method.get_service_status_display }}
+                        </span>
                       </div>
                     </div>
                     {% if method.description %}
@@ -198,6 +201,18 @@
 .checkout-steps .step.active .step-number {
   background: #343a40;
   color: #fff;
+}
+
+.payment-option-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payment-status {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 4px 10px;
 }
 
 .payment-method-card {

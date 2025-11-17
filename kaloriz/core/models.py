@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from catalog.models import Product
@@ -13,9 +14,21 @@ from django.db.models.functions import Coalesce
 class PaymentMethod(models.Model):
     name = models.CharField(max_length=100, verbose_name="Nama Metode")
     slug = models.SlugField(max_length=100, unique=True, verbose_name="Slug")
+    SERVICE_STATUS_CHOICES = [
+        ("available", "Tersedia"),
+        ("disrupted", "Sedang Gangguan"),
+    ]
+
     tagline = models.CharField(max_length=150, blank=True, verbose_name="Tagline")
     description = models.TextField(blank=True, verbose_name="Deskripsi")
     additional_info = models.TextField(blank=True, verbose_name="Informasi Tambahan")
+    service_status = models.CharField(
+        max_length=20,
+        choices=SERVICE_STATUS_CHOICES,
+        default="available",
+        verbose_name="Status Layanan",
+        help_text="Gunakan 'Sedang Gangguan' untuk menampilkan notifikasi masalah di halaman checkout.",
+    )
     button_label = models.CharField(
         max_length=50,
         blank=True,
@@ -54,6 +67,10 @@ class PaymentMethod(models.Model):
     @property
     def checkout_button_label(self):
         return self.button_label or 'Checkout'
+
+    @property
+    def is_available(self):
+        return self.service_status == "available"
 
 
 class Cart(models.Model):
@@ -145,6 +162,13 @@ class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', verbose_name="Pengguna")
     order_number = models.CharField(max_length=100, unique=True, verbose_name="Nomor Pesanan")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Status")
+    payment_method = models.CharField(max_length=100, blank=True, verbose_name="Metode Pembayaran")
+    payment_method_display = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Nama Metode Pembayaran",
+        help_text="Label yang ditampilkan kepada pengguna",
+    )
 
     # Shipping information (legacy fields)
     full_name = models.CharField(max_length=200, verbose_name="Nama Lengkap")
@@ -201,7 +225,32 @@ class Order(models.Model):
         verbose_name="Nomor Resi",
         help_text="Masukkan nomor resi pengiriman",
     )
+    tracking_url = models.URLField(
+        blank=True,
+        verbose_name="Link Pelacakan",
+        help_text="Masukkan URL pelacakan dari kurir",
+    )
 
+    payment_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Batas Pembayaran",
+        help_text="Waktu terakhir pembayaran sebelum pesanan dibatalkan otomatis",
+    )
+    midtrans_token = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Midtrans Snap Token",
+        help_text="Token Snap terakhir yang diterbitkan untuk pesanan ini",
+    )
+    midtrans_order_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Midtrans Order ID",
+        help_text="ID unik yang digunakan untuk transaksi Midtrans",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -210,8 +259,18 @@ class Order(models.Model):
         verbose_name_plural = "Pesanan"
         ordering = ['-created_at']
 
+    PAYMENT_TIMEOUT_HOURS = 1
+    MIDTRANS_ORDER_ID_PREFIX = "KALORIZ"
+    MIDTRANS_RETRY_SEPARATOR = "::retry::"
+
     def __str__(self):
         return f"Pesanan #{self.order_number}"
+
+    def save(self, *args, **kwargs):
+        if self.payment_deadline is None:
+            reference_time = self.created_at or timezone.now()
+            self.payment_deadline = reference_time + timedelta(hours=self.PAYMENT_TIMEOUT_HOURS)
+        super().save(*args, **kwargs)
 
     def get_status_display_class(self):
         """Return CSS class for status badge"""
@@ -224,6 +283,102 @@ class Order(models.Model):
             'cancelled': 'danger',
         }
         return status_classes.get(self.status, 'secondary')
+
+    def _build_midtrans_order_id_value(self) -> str:
+        if not self.pk:
+            raise ValueError("Order belum disimpan sehingga tidak memiliki ID Midtrans.")
+
+        prefix = getattr(settings, "MIDTRANS_ORDER_ID_PREFIX", self.MIDTRANS_ORDER_ID_PREFIX)
+        prefix = (prefix or self.MIDTRANS_ORDER_ID_PREFIX or "ORDER").strip()
+        pk_str = str(self.pk)
+        max_length = self._meta.get_field("midtrans_order_id").max_length
+        remaining = max_length - len(pk_str) - 1
+
+        if remaining <= 0:
+            return pk_str[-max_length:]
+
+        trimmed_prefix = prefix[:remaining]
+        candidate = f"{trimmed_prefix}-{pk_str}" if trimmed_prefix else pk_str[-max_length:]
+        return candidate[:max_length]
+
+    def ensure_midtrans_order_id(self) -> str:
+        """Ensure the order has a stable Midtrans order ID."""
+
+        if self.midtrans_order_id:
+            return self.midtrans_order_id
+
+        midtrans_order_id = self._build_midtrans_order_id_value()
+        self.midtrans_order_id = midtrans_order_id
+        self.save(update_fields=["midtrans_order_id"])
+        return midtrans_order_id
+
+    def _extract_midtrans_retry_state(self) -> tuple[str, int]:
+        separator = self.MIDTRANS_RETRY_SEPARATOR or ""
+        current_id = self.midtrans_order_id or ""
+        if separator and separator in current_id:
+            base, suffix = current_id.split(separator, 1)
+            try:
+                retry = int(suffix)
+            except (TypeError, ValueError):
+                retry = 0
+            return base or self._build_midtrans_order_id_value(), retry
+        return current_id or self._build_midtrans_order_id_value(), 0
+
+    def _build_midtrans_retry_candidate(self, base_id: str, retry: int) -> str:
+        separator = self.MIDTRANS_RETRY_SEPARATOR or ""
+        if retry <= 0 or not separator:
+            return base_id
+        suffix = f"{separator}{retry}"
+        field = self._meta.get_field("midtrans_order_id")
+        max_length = getattr(field, "max_length", 50)
+        if len(suffix) >= max_length:
+            return suffix[-max_length:]
+        allowed_base_length = max_length - len(suffix)
+        trimmed_base = (base_id or "")[:allowed_base_length]
+        if not trimmed_base:
+            pk_str = str(self.pk or "")
+            trimmed_base = pk_str[-allowed_base_length:]
+        return f"{trimmed_base}{suffix}"
+
+    def regenerate_midtrans_order_id(self) -> str:
+        """Generate a new Midtrans order_id for retry scenarios."""
+
+        base_id, current_retry = self._extract_midtrans_retry_state()
+        next_retry = current_retry + 1
+        candidate = self._build_midtrans_retry_candidate(base_id, next_retry)
+
+        order_model = self.__class__
+        while (
+            order_model.objects.exclude(pk=self.pk)
+            .filter(midtrans_order_id=candidate)
+            .exists()
+        ):
+            next_retry += 1
+            candidate = self._build_midtrans_retry_candidate(base_id, next_retry)
+
+        self.midtrans_order_id = candidate
+        self.midtrans_token = ""
+        self.save(update_fields=["midtrans_order_id", "midtrans_token"])
+        return candidate
+
+    def clear_midtrans_token(self):
+        if not self.midtrans_token:
+            return
+        self.midtrans_token = ""
+        self.save(update_fields=["midtrans_token"])
+
+    def get_payment_deadline(self):
+        if self.payment_deadline:
+            return self.payment_deadline
+        if not self.created_at:
+            return None
+        return self.created_at + timedelta(hours=self.PAYMENT_TIMEOUT_HOURS)
+
+    def is_payment_overdue(self):
+        deadline = self.get_payment_deadline()
+        if not deadline:
+            return False
+        return timezone.now() >= deadline
 
 
 class OrderItem(models.Model):

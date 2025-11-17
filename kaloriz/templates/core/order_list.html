@@ -46,6 +46,37 @@
         </tbody>
       </table>
     </div>
+
+    <div class="order-cards-list">
+      {% for order in orders %}
+      <article class="order-card">
+        <div class="order-card__header">
+          <div>
+            <span class="order-card__label">No. Pesanan</span>
+            <p class="order-card__value">{{ order.order_number }}</p>
+          </div>
+          <span class="order-card__date">{{ order.created_at|date:"d M Y H:i" }}</span>
+        </div>
+        <div class="order-card__status">
+          <span class="order-card__label">Status</span>
+          {% with badge=order.get_status_display_class %}
+            <span class="profile-badge {% if badge == 'success' %}success{% elif badge == 'warning' %}warning{% else %}info{% endif %}">
+              {{ order.get_status_display }}
+            </span>
+          {% endwith %}
+        </div>
+        <div class="order-card__footer">
+          <div>
+            <span class="order-card__label">Total</span>
+            <p class="order-card__total">Rp {{ order.total|floatformat:0 }}</p>
+          </div>
+          <a href="{% url 'core:order_detail' order.order_number %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-eye"></i> Detail
+          </a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
   {% else %}
     <div class="profile-empty">
       <i class="fas fa-receipt"></i>
