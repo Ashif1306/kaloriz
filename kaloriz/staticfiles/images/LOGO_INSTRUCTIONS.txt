@@ -1,0 +1,10 @@
+<!--
+  INSTRUKSI UPLOAD LOGO:
+
+  1. Siapkan file logo Anda (format: PNG, JPG, atau SVG)
+  2. Nama file yang disarankan: logo.png atau logo.svg
+  3. Upload ke folder: kaloriz/static/images/
+  4. Ukuran yang disarankan: 150x50 pixels atau ratio 3:1
+
+  Logo akan otomatis muncul di navbar dan footer
+-->
