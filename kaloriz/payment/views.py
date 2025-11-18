@@ -636,6 +636,7 @@ def payment_create_snap_token(request):
     notes = checkout_data.get("notes", "")
 
     token = None
+    reused = False
     order = None
     try:
         with transaction.atomic():
@@ -668,7 +669,7 @@ def payment_create_snap_token(request):
             transaction_payload = {
                 "transaction_details": {
                     "order_id": midtrans_order_id,
-                    "gross_amount": _to_int_amount(total),
+                    "gross_amount": _to_int_amount(order.total),
                 },
                 "item_details": item_details,
                 "customer_details": _build_customer_details(shipping_address, request.user),
@@ -679,15 +680,14 @@ def payment_create_snap_token(request):
                 "custom_field1": order.order_number,
             }
 
-            snap_response = snap_client.create_transaction(transaction_payload)
-            token = snap_response.get("token")
-            if not token:
-                raise RuntimeError("Token Snap tidak tersedia.")
-            order.midtrans_token = token
-            order.save(update_fields=["midtrans_token"])
+            token, reused = get_or_create_midtrans_snap_token(
+                order=order,
+                snap_client=snap_client,
+                transaction_payload=transaction_payload,
+            )
     except RuntimeError as exc:  # Token missing or business rule failure
-        logger.exception("Failed to create Midtrans Snap transaction: %s", exc)
-        return JsonResponse({"message": str(exc)}, status=500)
+        logger.warning("Failed to create Midtrans Snap transaction: %s", exc)
+        return JsonResponse({"message": str(exc)}, status=400)
     except Exception as exc:  # pylint: disable=broad-except
         default_message = "Gagal membuat Snap Token."
         message, response_payload, status_code = _extract_midtrans_error(exc, default_message)
@@ -695,7 +695,7 @@ def payment_create_snap_token(request):
         if response_payload:
             log_extra["midtrans_response"] = response_payload
         logger.exception("Failed to create order or Snap transaction: %s", exc, extra=log_extra)
-        http_status = status_code if isinstance(status_code, int) and 400 <= status_code < 600 else 500
+        http_status = status_code if isinstance(status_code, int) and 400 <= status_code < 600 else 400
         return JsonResponse({"message": message or default_message}, status=http_status)
 
     request.session["midtrans_order_id"] = order.order_number
@@ -703,7 +703,11 @@ def payment_create_snap_token(request):
     request.session.pop("discount", None)
     request.session.modified = True
 
-    return JsonResponse({"token": token, "order_id": order.order_number})
+    response_payload = {"token": token, "order_id": order.order_number}
+    if reused:
+        response_payload["reused"] = True
+
+    return JsonResponse(response_payload)
 
 
 @csrf_exempt
