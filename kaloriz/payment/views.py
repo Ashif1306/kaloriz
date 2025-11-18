@@ -313,6 +313,60 @@ def _build_item_details(selected_items, shipping_cost: Decimal, discount_amount:
     return details
 
 
+def _ensure_midtrans_item_detail_total(
+    item_details: list[dict],
+    total_amount: Decimal,
+) -> tuple[list[dict], int]:
+    """Ensure item_details total matches the gross amount expected by Midtrans.
+
+    Midtrans validates that the sum of (price * quantity) in item_details equals the
+    ``gross_amount`` provided in ``transaction_details``. When product prices contain
+    fractional Rupiah values, rounding each line item can cause mismatches that lead
+    to HTTP 400 responses from the Snap API. This helper normalizes each detail entry
+    and appends an adjustment line item when necessary so that the totals always
+    match the rounded order total.
+    """
+
+    gross_amount = _to_int_amount(total_amount)
+    normalized_details: list[dict] = []
+    running_total = 0
+
+    for detail in item_details or []:
+        price = int(detail.get("price") or 0)
+        quantity = int(detail.get("quantity") or 0) or 0
+        if quantity <= 0:
+            quantity = 1
+
+        normalized_detail = dict(detail)
+        normalized_detail["price"] = price
+        normalized_detail["quantity"] = quantity
+        normalized_details.append(normalized_detail)
+        running_total += price * quantity
+
+    difference = gross_amount - running_total
+    if difference:
+        normalized_details.append(
+            {
+                "id": "ADJUSTMENT",
+                "name": "Penyesuaian Pembulatan",
+                "price": difference,
+                "quantity": 1,
+            }
+        )
+
+    if not normalized_details and gross_amount:
+        normalized_details.append(
+            {
+                "id": "TOTAL",
+                "name": "Total Pesanan",
+                "price": gross_amount,
+                "quantity": 1,
+            }
+        )
+
+    return normalized_details, gross_amount
+
+
 def _build_customer_details(shipping_address: Address, user) -> dict:
     email = user.email or "customer@example.com"
     first_name = shipping_address.full_name or (user.get_full_name() or user.username)
@@ -627,6 +681,7 @@ def payment_create_snap_token(request):
             )
 
     item_details = _build_item_details(selected_items, shipping_cost, discount_amount, discount_code or "")
+    item_details, gross_amount = _ensure_midtrans_item_detail_total(item_details, order.total)
 
     order_id = f"INV-{timezone.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
     service_code = str(checkout_data.get("shipping_method") or "").upper()
@@ -669,7 +724,7 @@ def payment_create_snap_token(request):
             transaction_payload = {
                 "transaction_details": {
                     "order_id": midtrans_order_id,
-                    "gross_amount": _to_int_amount(order.total),
+                    "gross_amount": gross_amount,
                 },
                 "item_details": item_details,
                 "customer_details": _build_customer_details(shipping_address, request.user),
@@ -904,12 +959,15 @@ def payment_create_order_snap_token(request, order_number):
 
     midtrans_order_id = order.ensure_midtrans_order_id()
 
+    order_item_details = _build_order_payment_item_details(order)
+    order_item_details, gross_amount = _ensure_midtrans_item_detail_total(order_item_details, order.total)
+
     transaction_payload = {
         "transaction_details": {
             "order_id": midtrans_order_id,
-            "gross_amount": _to_int_amount(order.total),
+            "gross_amount": gross_amount,
         },
-        "item_details": _build_order_payment_item_details(order),
+        "item_details": order_item_details,
         "customer_details": _build_order_customer_details(order),
         "credit_card": {"secure": True},
         "callbacks": {
