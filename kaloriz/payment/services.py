@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Tuple
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
@@ -16,6 +17,15 @@ from core.models import Order
 logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUSES = {"expire", "cancel", "deny", "failure"}
+
+
+def _to_int_amount(value) -> int:
+    try:
+        decimal_value = Decimal(value or 0)
+    except (InvalidOperation, TypeError, ValueError):
+        decimal_value = Decimal("0")
+    quantized = decimal_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return int(quantized)
 
 
 def fetch_midtrans_transaction_status(order_id: str) -> dict | None:
@@ -84,6 +94,7 @@ def get_or_create_midtrans_snap_token(
     payload = dict(transaction_payload or {})
     transaction_details = dict(payload.get("transaction_details") or {})
     transaction_details["order_id"] = order.midtrans_order_id or ensured_order_id
+    transaction_details["gross_amount"] = _to_int_amount(order.total)
     payload["transaction_details"] = transaction_details
 
     snap_response = snap_client.create_transaction(payload)
