@@ -261,7 +261,8 @@ class Order(models.Model):
 
     PAYMENT_TIMEOUT_HOURS = 1
     MIDTRANS_ORDER_ID_PREFIX = "KALORIZ"
-    MIDTRANS_RETRY_SEPARATOR = "::retry::"
+    MIDTRANS_RETRY_SEPARATOR = "-R"
+    MIDTRANS_LEGACY_RETRY_SEPARATORS = ("::retry::",)
 
     def __str__(self):
         return f"Pesanan #{self.order_number}"
@@ -301,27 +302,57 @@ class Order(models.Model):
         candidate = f"{trimmed_prefix}-{pk_str}" if trimmed_prefix else pk_str[-max_length:]
         return candidate[:max_length]
 
+    def _is_midtrans_order_id_taken(self, candidate: str) -> bool:
+        if not candidate:
+            return False
+        order_model = self.__class__
+        return (
+            order_model.objects.exclude(pk=self.pk)
+            .filter(midtrans_order_id=candidate)
+            .exists()
+        )
+
+    def _assign_unique_midtrans_order_id(self, base_id: str) -> str:
+        """Assign a unique Midtrans order ID respecting the max length constraint."""
+
+        if not base_id:
+            base_id = self._build_midtrans_order_id_value()
+
+        candidate = base_id
+        retry = 0
+        while self._is_midtrans_order_id_taken(candidate):
+            retry += 1
+            candidate = self._build_midtrans_retry_candidate(base_id, retry)
+
+        self.midtrans_order_id = candidate
+        self.save(update_fields=["midtrans_order_id"])
+        return candidate
+
     def ensure_midtrans_order_id(self) -> str:
-        """Ensure the order has a stable Midtrans order ID."""
+        """Ensure the order has a stable and unique Midtrans order ID."""
 
         if self.midtrans_order_id:
+            if self._is_midtrans_order_id_taken(self.midtrans_order_id):
+                return self._assign_unique_midtrans_order_id(self.midtrans_order_id)
             return self.midtrans_order_id
 
-        midtrans_order_id = self._build_midtrans_order_id_value()
-        self.midtrans_order_id = midtrans_order_id
-        self.save(update_fields=["midtrans_order_id"])
-        return midtrans_order_id
+        base_id = self._build_midtrans_order_id_value()
+        return self._assign_unique_midtrans_order_id(base_id)
 
     def _extract_midtrans_retry_state(self) -> tuple[str, int]:
-        separator = self.MIDTRANS_RETRY_SEPARATOR or ""
+        separators = [self.MIDTRANS_RETRY_SEPARATOR]
+        separators.extend(self.MIDTRANS_LEGACY_RETRY_SEPARATORS)
         current_id = self.midtrans_order_id or ""
-        if separator and separator in current_id:
-            base, suffix = current_id.split(separator, 1)
-            try:
-                retry = int(suffix)
-            except (TypeError, ValueError):
-                retry = 0
-            return base or self._build_midtrans_order_id_value(), retry
+
+        for separator in filter(None, separators):
+            if separator in current_id:
+                base, suffix = current_id.split(separator, 1)
+                try:
+                    retry = int(suffix)
+                except (TypeError, ValueError):
+                    retry = 0
+                return base or self._build_midtrans_order_id_value(), retry
+
         return current_id or self._build_midtrans_order_id_value(), 0
 
     def _build_midtrans_retry_candidate(self, base_id: str, retry: int) -> str:
