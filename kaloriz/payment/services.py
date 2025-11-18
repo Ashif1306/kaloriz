@@ -74,15 +74,26 @@ def _should_refresh_midtrans_token(status_payload: dict | None) -> bool:
     return transaction_status in _RETRYABLE_STATUSES
 
 
-def get_or_create_midtrans_snap_token(
+def get_or_create_snap_token(
     *, order: Order, snap_client, transaction_payload: dict
 ) -> Tuple[str, bool]:
-    """Return an existing Snap token or create a new one when needed."""
+    """Return a reusable Midtrans Snap token or mint a new one.
+
+    The function follows these rules:
+    * When a token already exists and the order is still pending, reuse it so
+      Midtrans does not receive a duplicate order_id.
+    * When Midtrans reports that the previous transaction has expired/cancelled,
+      regenerate the order_id with an ``-R#`` suffix and request a fresh token.
+    * Any newly-created token is saved on the ``Order`` model for later reuse.
+    """
 
     verify_before_reuse = getattr(settings, "MIDTRANS_VERIFY_STATUS_BEFORE_REUSE", True)
+    is_pending = (order.status or "").lower() == "pending"
 
     if order.midtrans_token:
-        if verify_before_reuse:
+        if not is_pending:
+            order.clear_midtrans_token()
+        elif verify_before_reuse:
             status_payload = fetch_midtrans_transaction_status(order.midtrans_order_id)
             if not _should_refresh_midtrans_token(status_payload):
                 return order.midtrans_token, True

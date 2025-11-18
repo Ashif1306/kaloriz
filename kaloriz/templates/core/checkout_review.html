@@ -591,12 +591,17 @@
 
         const data = await response.json();
         const token = data && data.token;
+        const reusedToken = Boolean(data && data.reused);
 
         if (!token) {
           throw new Error('Token Snap tidak ditemukan');
         }
 
         toggleLoading(false);
+
+        if (reusedToken) {
+          showNotification('Menggunakan token Midtrans yang masih aktif.', 'info');
+        }
 
         window.snap.pay(token, {
           onSuccess: function (result) {
