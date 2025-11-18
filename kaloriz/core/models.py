@@ -237,19 +237,24 @@ class Order(models.Model):
         verbose_name="Batas Pembayaran",
         help_text="Waktu terakhir pembayaran sebelum pesanan dibatalkan otomatis",
     )
-    midtrans_token = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        verbose_name="Midtrans Snap Token",
-        help_text="Token Snap terakhir yang diterbitkan untuk pesanan ini",
-    )
     midtrans_order_id = models.CharField(
         max_length=50,
         blank=True,
-        default="",
+        null=True,
         verbose_name="Midtrans Order ID",
         help_text="ID unik yang digunakan untuk transaksi Midtrans",
+    )
+    midtrans_snap_token = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Midtrans Snap Token",
+        help_text="Token Snap terakhir yang diterbitkan untuk pesanan ini",
+    )
+    midtrans_retry = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Midtrans Retry Counter",
+        help_text="Jumlah percobaan pembuatan transaksi Midtrans",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -262,7 +267,6 @@ class Order(models.Model):
     PAYMENT_TIMEOUT_HOURS = 1
     MIDTRANS_ORDER_ID_PREFIX = "KALORIZ"
     MIDTRANS_RETRY_SEPARATOR = "-R"
-    MIDTRANS_LEGACY_RETRY_SEPARATORS = ("::retry::",)
 
     def __str__(self):
         return f"Pesanan #{self.order_number}"
@@ -285,118 +289,23 @@ class Order(models.Model):
         }
         return status_classes.get(self.status, 'secondary')
 
-    def _build_midtrans_order_id_value(self) -> str:
+    def get_midtrans_base_order_id(self) -> str:
+        """Return a deterministic base ID for Midtrans transactions."""
+
         if not self.pk:
             raise ValueError("Order belum disimpan sehingga tidak memiliki ID Midtrans.")
 
         prefix = getattr(settings, "MIDTRANS_ORDER_ID_PREFIX", self.MIDTRANS_ORDER_ID_PREFIX)
         prefix = (prefix or self.MIDTRANS_ORDER_ID_PREFIX or "ORDER").strip()
-        pk_str = str(self.pk)
+        base_id = f"{prefix}-{self.pk}" if prefix else str(self.pk)
         max_length = self._meta.get_field("midtrans_order_id").max_length
-        remaining = max_length - len(pk_str) - 1
+        return base_id[:max_length]
 
-        if remaining <= 0:
-            return pk_str[-max_length:]
-
-        trimmed_prefix = prefix[:remaining]
-        candidate = f"{trimmed_prefix}-{pk_str}" if trimmed_prefix else pk_str[-max_length:]
-        return candidate[:max_length]
-
-    def _is_midtrans_order_id_taken(self, candidate: str) -> bool:
-        if not candidate:
-            return False
-        order_model = self.__class__
-        return (
-            order_model.objects.exclude(pk=self.pk)
-            .filter(midtrans_order_id=candidate)
-            .exists()
-        )
-
-    def _assign_unique_midtrans_order_id(self, base_id: str) -> str:
-        """Assign a unique Midtrans order ID respecting the max length constraint."""
-
-        if not base_id:
-            base_id = self._build_midtrans_order_id_value()
-
-        candidate = base_id
-        retry = 0
-        while self._is_midtrans_order_id_taken(candidate):
-            retry += 1
-            candidate = self._build_midtrans_retry_candidate(base_id, retry)
-
-        self.midtrans_order_id = candidate
-        self.save(update_fields=["midtrans_order_id"])
-        return candidate
-
-    def ensure_midtrans_order_id(self) -> str:
-        """Ensure the order has a stable and unique Midtrans order ID."""
-
-        if self.midtrans_order_id:
-            if self._is_midtrans_order_id_taken(self.midtrans_order_id):
-                return self._assign_unique_midtrans_order_id(self.midtrans_order_id)
-            return self.midtrans_order_id
-
-        base_id = self._build_midtrans_order_id_value()
-        return self._assign_unique_midtrans_order_id(base_id)
-
-    def _extract_midtrans_retry_state(self) -> tuple[str, int]:
-        separators = [self.MIDTRANS_RETRY_SEPARATOR]
-        separators.extend(self.MIDTRANS_LEGACY_RETRY_SEPARATORS)
-        current_id = self.midtrans_order_id or ""
-
-        for separator in filter(None, separators):
-            if separator in current_id:
-                base, suffix = current_id.split(separator, 1)
-                try:
-                    retry = int(suffix)
-                except (TypeError, ValueError):
-                    retry = 0
-                return base or self._build_midtrans_order_id_value(), retry
-
-        return current_id or self._build_midtrans_order_id_value(), 0
-
-    def _build_midtrans_retry_candidate(self, base_id: str, retry: int) -> str:
-        separator = self.MIDTRANS_RETRY_SEPARATOR or ""
-        if retry <= 0 or not separator:
-            return base_id
-        suffix = f"{separator}{retry}"
-        field = self._meta.get_field("midtrans_order_id")
-        max_length = getattr(field, "max_length", 50)
-        if len(suffix) >= max_length:
-            return suffix[-max_length:]
-        allowed_base_length = max_length - len(suffix)
-        trimmed_base = (base_id or "")[:allowed_base_length]
-        if not trimmed_base:
-            pk_str = str(self.pk or "")
-            trimmed_base = pk_str[-allowed_base_length:]
-        return f"{trimmed_base}{suffix}"
-
-    def regenerate_midtrans_order_id(self) -> str:
-        """Generate a new Midtrans order_id for retry scenarios."""
-
-        base_id, current_retry = self._extract_midtrans_retry_state()
-        next_retry = current_retry + 1
-        candidate = self._build_midtrans_retry_candidate(base_id, next_retry)
-
-        order_model = self.__class__
-        while (
-            order_model.objects.exclude(pk=self.pk)
-            .filter(midtrans_order_id=candidate)
-            .exists()
-        ):
-            next_retry += 1
-            candidate = self._build_midtrans_retry_candidate(base_id, next_retry)
-
-        self.midtrans_order_id = candidate
-        self.midtrans_token = ""
-        self.save(update_fields=["midtrans_order_id", "midtrans_token"])
-        return candidate
-
-    def clear_midtrans_token(self):
-        if not self.midtrans_token:
+    def clear_midtrans_snap_token(self):
+        if not self.midtrans_snap_token:
             return
-        self.midtrans_token = ""
-        self.save(update_fields=["midtrans_token"])
+        self.midtrans_snap_token = None
+        self.save(update_fields=["midtrans_snap_token"])
 
     def get_payment_deadline(self):
         if self.payment_deadline:

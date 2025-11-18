@@ -15,8 +15,8 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.http import Http404, JsonResponse
+from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -591,11 +591,6 @@ def _build_doku_line_items_from_order(order: Order) -> list[dict]:
 def payment_create_snap_token(request):
     """Create a Midtrans Snap transaction token."""
     try:
-        client_payload = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        client_payload = {}
-
-    try:
         snap_client = _build_midtrans_client()
     except RuntimeError as exc:
         logger.exception("Midtrans configuration error: %s", exc)
@@ -657,17 +652,6 @@ def payment_create_snap_token(request):
     if total < 0:
         total = Decimal("0")
 
-    # Validate client-provided totals if available
-    client_total_value = client_payload.get("total")
-    if client_total_value is not None:
-        client_total = _to_decimal(client_total_value)
-        if client_total != total:
-            logger.warning(
-                "Client total %s does not match server total %s",
-                client_total,
-                total,
-            )
-
     selected_items, selected_quantities = _prepare_selected_cart_items(selected_items_qs)
     if not selected_items:
         return JsonResponse({"message": "Tidak ada item yang dipilih untuk pembayaran."}, status=400)
@@ -717,19 +701,16 @@ def payment_create_snap_token(request):
                 payment_method_display=(payment_method_obj.name if payment_method_obj else selected_payment_slug),
             )
             order_item_details = _build_order_payment_item_details(order)
-            order_item_details, gross_amount = _ensure_midtrans_item_detail_total(
+            order_item_details, _ = _ensure_midtrans_item_detail_total(
                 order_item_details,
                 order.total,
             )
-            midtrans_order_id = order.ensure_midtrans_order_id()
+            customer_details = _build_customer_details(shipping_address, request.user)
 
-            transaction_payload = {
-                "transaction_details": {
-                    "order_id": midtrans_order_id,
-                    "gross_amount": gross_amount,
-                },
+            base_payload = {
+                "transaction_details": {},
                 "item_details": order_item_details,
-                "customer_details": _build_customer_details(shipping_address, request.user),
+                "customer_details": customer_details,
                 "credit_card": {"secure": True},
                 "callbacks": {
                     "finish": request.build_absolute_uri("/payment/finish/"),
@@ -740,7 +721,7 @@ def payment_create_snap_token(request):
             token, reused = get_or_create_snap_token(
                 order=order,
                 snap_client=snap_client,
-                transaction_payload=transaction_payload,
+                base_payload=base_payload,
             )
     except RuntimeError as exc:  # Token missing or business rule failure
         logger.warning("Failed to create Midtrans Snap transaction: %s", exc)
@@ -760,9 +741,7 @@ def payment_create_snap_token(request):
     request.session.pop("discount", None)
     request.session.modified = True
 
-    response_payload = {"token": token, "order_id": order.order_number}
-    if reused:
-        response_payload["reused"] = True
+    response_payload = {"token": token, "reused": bool(reused)}
 
     return JsonResponse(response_payload)
 
@@ -939,14 +918,13 @@ def payment_create_order_snap_token(request, order_number):
         logger.exception("Midtrans configuration error: %s", exc)
         return JsonResponse({"message": str(exc)}, status=500)
 
-    order = (
-        Order.objects.filter(order_number=order_number, user=request.user)
-        .select_related("shipping_address")
-        .prefetch_related("items")
-        .first()
-    )
-
-    if order is None:
+    try:
+        order = get_object_or_404(
+            Order.objects.select_related("shipping_address").prefetch_related("items"),
+            order_number=order_number,
+            user=request.user,
+        )
+    except Http404:
         return JsonResponse({"message": "Pesanan tidak ditemukan."}, status=404)
 
     if cancel_order_due_to_timeout(order):
@@ -959,16 +937,11 @@ def payment_create_order_snap_token(request, order_number):
     if (order.payment_method or "").lower() != (midtrans_slug or "").lower():
         return JsonResponse({"message": "Metode pembayaran pesanan tidak menggunakan Midtrans."}, status=400)
 
-    midtrans_order_id = order.ensure_midtrans_order_id()
-
     order_item_details = _build_order_payment_item_details(order)
-    order_item_details, gross_amount = _ensure_midtrans_item_detail_total(order_item_details, order.total)
+    order_item_details, _ = _ensure_midtrans_item_detail_total(order_item_details, order.total)
 
-    transaction_payload = {
-        "transaction_details": {
-            "order_id": midtrans_order_id,
-            "gross_amount": gross_amount,
-        },
+    base_payload = {
+        "transaction_details": {},
         "item_details": order_item_details,
         "customer_details": _build_order_customer_details(order),
         "credit_card": {"secure": True},
@@ -982,7 +955,7 @@ def payment_create_order_snap_token(request, order_number):
         token, reused = get_or_create_snap_token(
             order=order,
             snap_client=snap_client,
-            transaction_payload=transaction_payload,
+            base_payload=base_payload,
         )
     except Exception as exc:  # pylint: disable=broad-except
         default_message = "Gagal membuat token pembayaran."
@@ -999,7 +972,7 @@ def payment_create_order_snap_token(request, order_number):
         http_status = status_code if isinstance(status_code, int) and 400 <= status_code < 600 else 500
         return JsonResponse({"message": message or default_message}, status=http_status)
 
-    return JsonResponse({"token": token, "order_id": order.order_number, "reused": reused})
+    return JsonResponse({"token": token, "reused": bool(reused)})
 
 
 @login_required
@@ -1112,9 +1085,9 @@ def payment_finish(request):
         if transaction_status in success_states and order.status != "paid":
             order.status = "paid"
             update_fields = ["status"]
-            if order.midtrans_token:
-                order.midtrans_token = ""
-                update_fields.append("midtrans_token")
+            if order.midtrans_snap_token:
+                order.midtrans_snap_token = None
+                update_fields.append("midtrans_snap_token")
             order.save(update_fields=update_fields)
         elif transaction_status in pending_states and order.status != "pending":
             order.status = "pending"
@@ -1124,9 +1097,9 @@ def payment_finish(request):
                 restore_order_stock(order)
                 order.status = "cancelled"
                 update_fields = ["status"]
-                if order.midtrans_token:
-                    order.midtrans_token = ""
-                    update_fields.append("midtrans_token")
+                if order.midtrans_snap_token:
+                    order.midtrans_snap_token = None
+                    update_fields.append("midtrans_snap_token")
                 order.save(update_fields=update_fields)
 
     request.session["midtrans_last_result"] = result

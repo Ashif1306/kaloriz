@@ -585,11 +585,17 @@
           body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-          throw new Error('Gagal membuat Snap Token');
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = null;
         }
 
-        const data = await response.json();
+        if (!response.ok) {
+          const message = data && (data.message || data.error);
+          throw new Error(message || 'Gagal membuat Snap Token');
+        }
         const token = data && data.token;
         const reusedToken = Boolean(data && data.reused);
 
