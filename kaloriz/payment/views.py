@@ -3,9 +3,9 @@ import base64
 import datetime
 import json
 import logging
-import uuid
 import hashlib
 import hmac
+import uuid
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
@@ -15,7 +15,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -23,7 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from catalog.models import DiscountCode
-from core.models import Order, PaymentMethod
+from core.models import Cart, Order, PaymentMethod
 from core.views import _get_active_cart, _prepare_selected_cart_items
 from core.services.orders import create_order_from_checkout, restore_order_stock, cancel_order_due_to_timeout
 from payment.services import get_or_create_midtrans_snap_token
@@ -314,7 +314,7 @@ def _build_item_details(selected_items, shipping_cost: Decimal, discount_amount:
 
 
 def _build_customer_details(shipping_address: Address, user) -> dict:
-    email = user.email or "customer@example.com"
+    email = _get_customer_email(user)
     first_name = shipping_address.full_name or (user.get_full_name() or user.username)
 
     address_payload = {
@@ -336,6 +336,21 @@ def _build_customer_details(shipping_address: Address, user) -> dict:
         "billing_address": address_payload,
         "shipping_address": address_payload,
     }
+
+
+def _get_customer_email(user) -> str:
+    """Return a non-empty email for Midtrans order snapshots."""
+
+    email = (getattr(user, "email", "") or "").strip()
+    if email:
+        return email
+
+    for setting_name in ("DEFAULT_CUSTOMER_EMAIL", "DEFAULT_FROM_EMAIL", "SERVER_EMAIL"):
+        fallback = getattr(settings, setting_name, "")
+        if fallback:
+            return fallback
+
+    return "customer@example.com"
 
 
 def _build_doku_line_items(
@@ -531,50 +546,115 @@ def _build_doku_line_items_from_order(order: Order) -> list[dict]:
 
     return line_items
 
+def _generate_unique_checkout_order_number(prefix: str = "INV") -> str:
+    """Generate a timestamp + UUID based order number that fits Midtrans limits."""
+
+    timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+    random_suffix = uuid.uuid4().hex[:8].upper()
+    return f"{prefix}-{timestamp}-{random_suffix}"
+
+
 @csrf_exempt
 @login_required
 @require_POST
 def payment_create_snap_token(request):
-    """Create a Midtrans Snap transaction token."""
-    try:
-        client_payload = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        client_payload = {}
+    """Create a Midtrans Snap transaction token safely.
+
+    Contoh JS fetch di frontend:
+
+    fetch(createTokenUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        credentials: 'same-origin'
+    })
+      .then((res) => res.json())
+      .then((payload) => {
+          if (payload.token) {
+              snap.pay(payload.token);
+          } else {
+              alert(payload.message);
+          }
+      });
+    """
+
+    log_context = {"user_id": getattr(request.user, "id", None)}
+    logger.debug("payment_create_snap_token called", extra=log_context)
+
+    def _json_error(message, *, reason="invalid_request", status=400, extra=None):
+        response_payload = {"message": message, "reason": reason}
+        log_extra = {**log_context, "reason": reason}
+        if extra:
+            log_extra.update(extra)
+        logger.warning("payment_create_snap_token error: %s", message, extra=log_extra)
+        return JsonResponse(response_payload, status=status)
 
     try:
         snap_client = _build_midtrans_client()
     except RuntimeError as exc:
-        logger.exception("Midtrans configuration error: %s", exc)
-        return JsonResponse({"message": str(exc)}, status=500)
+        logger.exception("Midtrans configuration error: %s", exc, extra=log_context)
+        return _json_error(str(exc), reason="midtrans_configuration", status=500)
 
     try:
         cart = _get_active_cart(request)
+    except Http404 as exc:
+        if request.user.is_staff:
+            cart, _ = Cart.objects.get_or_create(user=request.user)
+            logger.info(
+                "Staff user missing cart. Generated fallback cart.",
+                extra={**log_context, "cart_id": getattr(cart, "id", None)},
+            )
+        else:
+            logger.exception("Cart lookup failed: %s", exc, extra=log_context)
+            return _json_error("Keranjang tidak ditemukan.", reason="cart_not_found")
     except Exception as exc:  # pylint: disable=broad-except
-        logger.exception("Cart lookup failed: %s", exc)
-        return JsonResponse({"message": "Keranjang tidak ditemukan."}, status=400)
+        logger.exception("Cart lookup failed: %s", exc, extra=log_context)
+        return _json_error("Keranjang tidak ditemukan.", reason="cart_not_found")
 
+    cart_id = getattr(cart, "id", None)
     selected_items_qs = cart.items.filter(is_selected=True).select_related("product")
     if not selected_items_qs.exists():
-        return JsonResponse({"message": "Tidak ada item yang dipilih untuk pembayaran."}, status=400)
+        return _json_error(
+            "Tidak ada item yang dipilih untuk pembayaran.",
+            reason="empty_cart",
+            extra={"cart_id": cart_id},
+        )
 
-    checkout_data = request.session.get("checkout", {})
-    midtrans_slug = getattr(settings, "MIDTRANS_PAYMENT_METHOD_SLUG", "midtrans")
+    checkout_data = request.session.get("checkout")
+    if not isinstance(checkout_data, dict):
+        checkout_data = {}
+    if checkout_data.get("user_id") and checkout_data.get("user_id") != request.user.id:
+        # Checkout milik user sebelumnya. Reset agar tidak ikut ke user baru.
+        logger.info(
+            "Checkout data belongs to different user. Resetting checkout session.",
+            extra={**log_context, "checkout_owner": checkout_data.get("user_id")},
+        )
+        request.session.pop("checkout", None)
+        checkout_data = {}
+
+    if not checkout_data:
+        return _json_error(
+            "Data checkout tidak ditemukan. Silakan ulangi proses checkout.",
+            reason="missing_checkout",
+        )
+    if not checkout_data.get("user_id"):
+        checkout_data["user_id"] = request.user.id
+        request.session["checkout"] = checkout_data
+        request.session.modified = True
+
+    midtrans_slug = getattr(settings, "MIDTRANS_PAYMENT_METHOD_SLUG", "midtrans") or ""
     selected_payment_slug = (checkout_data.get("payment_method") or "").strip().lower()
-    if selected_payment_slug != (midtrans_slug or "").lower():
-        logger.warning(
-            "Attempt to create Midtrans token with unsupported payment method: %s",
-            selected_payment_slug,
+    if not selected_payment_slug:
+        return _json_error("Metode pembayaran belum dipilih.", reason="missing_payment_method")
+    if selected_payment_slug != midtrans_slug.lower():
+        return _json_error(
+            "Metode pembayaran ini tidak menggunakan Midtrans.",
+            reason="unsupported_payment_method",
         )
-        return JsonResponse(
-            {"message": "Metode pembayaran ini tidak menggunakan Midtrans."},
-            status=400,
-        )
+
     address_id = checkout_data.get("address_id")
-    payment_method_obj = (
-        PaymentMethod.objects.filter(slug__iexact=selected_payment_slug).first()
-        if selected_payment_slug
-        else None
-    )
+    if not address_id:
+        return _json_error("Alamat pengiriman belum dipilih.", reason="missing_address")
+
     payment_method_obj = (
         PaymentMethod.objects.filter(slug__iexact=selected_payment_slug).first()
         if selected_payment_slug
@@ -585,58 +665,68 @@ def payment_create_snap_token(request):
         .select_related("district")
         .first()
     )
-
     if not shipping_address:
-        return JsonResponse({"message": "Alamat pengiriman tidak ditemukan."}, status=400)
+        return _json_error(
+            "Alamat pengiriman tidak ditemukan.",
+            reason="shipping_address_not_found",
+            extra={"address_id": address_id},
+        )
 
-    shipping_cost = _to_decimal(checkout_data.get("shipping_cost"))
+    raw_shipping_cost = checkout_data.get("shipping_cost")
+    if raw_shipping_cost in (None, ""):
+        return _json_error("Biaya pengiriman belum dihitung.", reason="missing_shipping_cost")
+
+    shipping_method = checkout_data.get("shipping_method")
+    if not shipping_method:
+        return _json_error("Metode pengiriman belum dipilih.", reason="missing_shipping_method")
+
+    shipping_cost = _to_decimal(raw_shipping_cost)
     subtotal = _to_decimal(cart.get_selected_total())
-
     discount_amount, discount_code = _calculate_discount(
         subtotal,
         shipping_cost,
-        checkout_data.get("shipping_method"),
+        shipping_method,
         request.session.get("discount"),
     )
-
     total = subtotal + shipping_cost - discount_amount
     if total < 0:
         total = Decimal("0")
 
-    # Validate client-provided totals if available
-    client_total_value = client_payload.get("total")
-    if client_total_value is not None:
-        client_total = _to_decimal(client_total_value)
-        if client_total != total:
-            logger.warning(
-                "Client total %s does not match server total %s",
-                client_total,
-                total,
-            )
-
     selected_items, selected_quantities = _prepare_selected_cart_items(selected_items_qs)
-    if not selected_items:
-        return JsonResponse({"message": "Tidak ada item yang dipilih untuk pembayaran."}, status=400)
-
     for item in selected_items:
         quantity = selected_quantities.get(item.pk, item.quantity)
         if item.product.stock < quantity:
-            return JsonResponse(
-                {"message": f"Stok {item.product.name} tidak mencukupi."},
-                status=400,
+            return _json_error(
+                f"Stok {item.product.name} tidak mencukupi.",
+                reason="insufficient_stock",
+                extra={"product_id": item.product_id},
             )
 
-    item_details = _build_item_details(selected_items, shipping_cost, discount_amount, discount_code or "")
+    item_details = _build_item_details(
+        selected_items,
+        shipping_cost,
+        discount_amount,
+        discount_code or "",
+    )
 
-    order_id = f"INV-{timezone.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
-    service_code = str(checkout_data.get("shipping_method") or "").upper()
+    order_number = _generate_unique_checkout_order_number()
+    service_code = str(shipping_method or "").upper()
     service_label = "Express" if service_code == "EXP" else "Reguler"
     district_name = getattr(getattr(shipping_address, "district", None), "name", "")
     eta = checkout_data.get("eta")
     notes = checkout_data.get("notes", "")
 
-    token = None
+    logger.debug(
+        "Creating order %s with total %s",
+        order_number,
+        total,
+        extra={**log_context, "cart_id": cart_id},
+    )
+
     order = None
+    customer_email = _get_customer_email(request.user)
+    token = None
+
     try:
         with transaction.atomic():
             order = create_order_from_checkout(
@@ -644,12 +734,12 @@ def payment_create_snap_token(request):
                 cart=cart,
                 selected_items=selected_items,
                 selected_quantities=selected_quantities,
-                order_number=order_id,
+                order_number=order_number,
                 subtotal=subtotal,
                 shipping_cost=shipping_cost,
                 total=total,
                 shipping_full_name=shipping_address.full_name,
-                shipping_email=request.user.email,
+                shipping_email=customer_email,
                 shipping_phone=shipping_address.phone,
                 shipping_address_text=shipping_address.get_full_address(),
                 shipping_city=shipping_address.city,
@@ -661,11 +751,20 @@ def payment_create_snap_token(request):
                 shipping_address_obj=shipping_address,
                 shipping_service_name=service_label,
                 payment_method_slug=selected_payment_slug,
-                payment_method_display=(payment_method_obj.name if payment_method_obj else selected_payment_slug),
+                payment_method_display=(
+                    payment_method_obj.name if payment_method_obj else selected_payment_slug
+                ),
             )
-            midtrans_order_id = order.ensure_midtrans_order_id()
 
-            transaction_payload = {
+            midtrans_order_id = order.order_number
+            max_midtrans_length = Order._meta.get_field("midtrans_order_id").max_length
+            if len(midtrans_order_id) > max_midtrans_length:
+                midtrans_order_id = order.ensure_midtrans_order_id()
+            elif order.midtrans_order_id != midtrans_order_id:
+                order.midtrans_order_id = midtrans_order_id
+                order.save(update_fields=["midtrans_order_id"])
+
+            payload = {
                 "transaction_details": {
                     "order_id": midtrans_order_id,
                     "gross_amount": _to_int_amount(total),
@@ -673,36 +772,42 @@ def payment_create_snap_token(request):
                 "item_details": item_details,
                 "customer_details": _build_customer_details(shipping_address, request.user),
                 "credit_card": {"secure": True},
-                "callbacks": {
-                    "finish": request.build_absolute_uri("/payment/finish/"),
-                },
+                "callbacks": {"finish": request.build_absolute_uri("/payment/finish/")},
                 "custom_field1": order.order_number,
             }
-
-            snap_response = snap_client.create_transaction(transaction_payload)
+            logger.debug(
+                "Sending payload to Midtrans",
+                extra={**log_context, "order_number": order.order_number, "payload": payload},
+            )
+            snap_response = snap_client.create_transaction(payload)
             token = snap_response.get("token")
             if not token:
                 raise RuntimeError("Token Snap tidak tersedia.")
             order.midtrans_token = token
             order.save(update_fields=["midtrans_token"])
-    except RuntimeError as exc:  # Token missing or business rule failure
-        logger.exception("Failed to create Midtrans Snap transaction: %s", exc)
-        return JsonResponse({"message": str(exc)}, status=500)
+
+    except RuntimeError as exc:
+        logger.exception("Failed to create Midtrans Snap transaction: %s", exc, extra=log_context)
+        return _json_error(str(exc), reason="midtrans_token", status=400)
     except Exception as exc:  # pylint: disable=broad-except
         default_message = "Gagal membuat Snap Token."
         message, response_payload, status_code = _extract_midtrans_error(exc, default_message)
-        log_extra = {"order_number": getattr(order, "order_number", None)}
+        log_extra = {**log_context, "order_number": getattr(order, "order_number", None)}
         if response_payload:
             log_extra["midtrans_response"] = response_payload
         logger.exception("Failed to create order or Snap transaction: %s", exc, extra=log_extra)
-        http_status = status_code if isinstance(status_code, int) and 400 <= status_code < 600 else 500
-        return JsonResponse({"message": message or default_message}, status=http_status)
+        http_status = 400 if status_code and 400 <= status_code < 500 else 400
+        return _json_error(message or default_message, status=http_status, extra=log_extra)
 
     request.session["midtrans_order_id"] = order.order_number
     request.session.pop("checkout", None)
     request.session.pop("discount", None)
     request.session.modified = True
 
+    logger.info(
+        "Snap token created successfully",
+        extra={**log_context, "order_number": order.order_number},
+    )
     return JsonResponse({"token": token, "order_id": order.order_number})
 
 
@@ -768,7 +873,8 @@ def payment_create_doku_checkout(request):
                 status=400,
             )
 
-    order_id = f"INV-{timezone.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
+    # Generate unique order_id dengan UUID penuh untuk menghindari collision
+    order_id = f"INV-{timezone.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex.upper()}"
     service_code = str(checkout_data.get("shipping_method") or "").upper()
     service_label = "Express" if service_code == "EXP" else "Reguler"
     district_name = getattr(getattr(shipping_address, "district", None), "name", "")
@@ -809,6 +915,9 @@ def payment_create_doku_checkout(request):
     }
 
     order = None
+    customer_email = _get_customer_email(request.user)
+
+    # Tambahkan try/except untuk mencegah HTTP 500
     try:
         with transaction.atomic():
             order = create_order_from_checkout(
@@ -821,7 +930,7 @@ def payment_create_doku_checkout(request):
                 shipping_cost=shipping_cost,
                 total=total,
                 shipping_full_name=shipping_address.full_name,
-                shipping_email=request.user.email,
+                shipping_email=customer_email,
                 shipping_phone=shipping_address.phone,
                 shipping_address_text=shipping_address.get_full_address(),
                 shipping_city=shipping_address.city,
@@ -854,10 +963,11 @@ def payment_create_doku_checkout(request):
 
     except RuntimeError as exc:
         logger.exception("Failed to create DOKU checkout: %s", exc)
-        return JsonResponse({"message": str(exc)}, status=500)
+        return JsonResponse({"message": str(exc)}, status=400)
+
     except Exception as exc:  # pylint: disable=broad-except
         logger.exception("Failed to create order or DOKU checkout: %s", exc)
-        return JsonResponse({"message": "Gagal membuat sesi pembayaran DOKU."}, status=500)
+        return JsonResponse({"message": "Gagal membuat sesi pembayaran DOKU."}, status=400)
 
     request.session["doku_order_id"] = order.order_number
     request.session.pop("checkout", None)
