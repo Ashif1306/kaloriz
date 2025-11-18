@@ -680,9 +680,6 @@ def payment_create_snap_token(request):
                 status=400,
             )
 
-    item_details = _build_item_details(selected_items, shipping_cost, discount_amount, discount_code or "")
-    item_details, gross_amount = _ensure_midtrans_item_detail_total(item_details, order.total)
-
     order_id = f"INV-{timezone.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
     service_code = str(checkout_data.get("shipping_method") or "").upper()
     service_label = "Express" if service_code == "EXP" else "Reguler"
@@ -719,6 +716,11 @@ def payment_create_snap_token(request):
                 payment_method_slug=selected_payment_slug,
                 payment_method_display=(payment_method_obj.name if payment_method_obj else selected_payment_slug),
             )
+            order_item_details = _build_order_payment_item_details(order)
+            order_item_details, gross_amount = _ensure_midtrans_item_detail_total(
+                order_item_details,
+                order.total,
+            )
             midtrans_order_id = order.ensure_midtrans_order_id()
 
             transaction_payload = {
@@ -726,7 +728,7 @@ def payment_create_snap_token(request):
                     "order_id": midtrans_order_id,
                     "gross_amount": gross_amount,
                 },
-                "item_details": item_details,
+                "item_details": order_item_details,
                 "customer_details": _build_customer_details(shipping_address, request.user),
                 "credit_card": {"secure": True},
                 "callbacks": {
