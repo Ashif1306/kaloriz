@@ -441,29 +441,18 @@
             }
           });
 
-          let data = null;
-          try {
-            data = await response.json();
-          } catch (error) {
-            data = null;
-          }
-
           if (!response.ok) {
-            const message = data && (data.message || data.error);
-            throw new Error(message || 'Gagal membuat token pembayaran.');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Gagal membuat token pembayaran.');
           }
 
+          const data = await response.json();
           const token = data && data.token;
-          const reusedToken = Boolean(data && data.reused);
           if (!token) {
             throw new Error('Token pembayaran tidak tersedia.');
           }
 
           toggleLoading(false);
-
-          if (reusedToken) {
-            showNotification('Menggunakan token Midtrans yang masih aktif.', 'info');
-          }
 
           window.snap.pay(token, {
             onSuccess(result) {
