@@ -16,8 +16,6 @@ from core.models import Order
 
 logger = logging.getLogger(__name__)
 
-_RETRYABLE_STATUSES = {"expire", "cancel", "deny", "failure"}
-
 
 def _to_int_amount(value) -> int:
     try:
@@ -67,44 +65,88 @@ def fetch_midtrans_transaction_status(order_id: str) -> dict | None:
         return None
 
 
-def _should_refresh_midtrans_token(status_payload: dict | None) -> bool:
-    if not status_payload:
-        return False
-    transaction_status = (status_payload.get("transaction_status") or "").lower()
-    return transaction_status in _RETRYABLE_STATUSES
+def _split_midtrans_order_id(order: Order) -> tuple[str | None, int]:
+    """Return the base order ID and last retry extracted from the stored value."""
+
+    current_id = (order.midtrans_order_id or "").strip() or None
+    separators = [getattr(Order, "MIDTRANS_RETRY_SEPARATOR", "-R")]
+    legacy = getattr(Order, "MIDTRANS_LEGACY_RETRY_SEPARATORS", ("::retry::",))
+    separators.extend(filter(None, legacy))
+
+    if not current_id:
+        return None, 0
+
+    for separator in separators:
+        if separator and separator in current_id:
+            base, suffix = current_id.split(separator, 1)
+            try:
+                retry_value = int(suffix)
+            except (TypeError, ValueError):
+                retry_value = 0
+            return (base or None), retry_value
+
+    return current_id, 0
 
 
-def get_or_create_snap_token(
-    *, order: Order, snap_client, transaction_payload: dict
-) -> Tuple[str, bool]:
-    """Return a reusable Midtrans Snap token or mint a new one.
+def _build_midtrans_base_id(order: Order) -> str:
+    try:
+        base_id = order.get_midtrans_base_order_id()
+    except AttributeError:  # pragma: no cover - legacy safety
+        prefix = getattr(settings, "MIDTRANS_ORDER_ID_PREFIX", getattr(Order, "MIDTRANS_ORDER_ID_PREFIX", "KALORIZ"))
+        prefix = (prefix or "KALORIZ").strip()
+        base_id = f"{prefix}-{order.pk}"
+    return base_id
 
-    The function follows these rules:
-    * When a token already exists and the order is still pending, reuse it so
-      Midtrans does not receive a duplicate order_id.
-    * When Midtrans reports that the previous transaction has expired/cancelled,
-      regenerate the order_id with an ``-R#`` suffix and request a fresh token.
-    * Any newly-created token is saved on the ``Order`` model for later reuse.
-    """
 
-    verify_before_reuse = getattr(settings, "MIDTRANS_VERIFY_STATUS_BEFORE_REUSE", True)
+def _compose_midtrans_order_id(order: Order, base_id: str, retry_index: int) -> str:
+    field = order._meta.get_field("midtrans_order_id")
+    max_length = getattr(field, "max_length", 50)
+    separator = getattr(Order, "MIDTRANS_RETRY_SEPARATOR", "-R")
+    normalized_base = (base_id or _build_midtrans_base_id(order))[:max_length]
+
+    if retry_index <= 0 or not separator:
+        return normalized_base
+
+    suffix = f"{separator}{retry_index}"
+    if len(suffix) >= max_length:
+        return suffix[-max_length:]
+
+    allowed_base_length = max_length - len(suffix)
+    trimmed_base = normalized_base[:allowed_base_length]
+    if not trimmed_base:
+        trimmed_base = normalized_base[-allowed_base_length:]
+
+    return f"{trimmed_base}{suffix}"
+
+
+def _clone_payload(base_payload: dict | None) -> dict:
+    payload = dict(base_payload or {})
+    payload["transaction_details"] = dict(payload.get("transaction_details") or {})
+    payload["item_details"] = list(payload.get("item_details") or [])
+    payload["customer_details"] = dict(payload.get("customer_details") or {})
+    return payload
+
+
+def get_or_create_snap_token(*, order: Order, snap_client, base_payload: dict) -> Tuple[str, bool]:
+    """Return a reusable Midtrans Snap token or mint a new one."""
+
     is_pending = (order.status or "").lower() == "pending"
+    existing_token = (order.midtrans_snap_token or "").strip()
 
-    if order.midtrans_token:
-        if not is_pending:
-            order.clear_midtrans_token()
-        elif verify_before_reuse:
-            status_payload = fetch_midtrans_transaction_status(order.midtrans_order_id)
-            if not _should_refresh_midtrans_token(status_payload):
-                return order.midtrans_token, True
-            order.regenerate_midtrans_order_id()
-        else:
-            return order.midtrans_token, True
+    if existing_token and is_pending:
+        return existing_token, True
 
-    ensured_order_id = order.ensure_midtrans_order_id()
-    payload = dict(transaction_payload or {})
-    transaction_details = dict(payload.get("transaction_details") or {})
-    transaction_details["order_id"] = order.midtrans_order_id or ensured_order_id
+    if existing_token and not is_pending:
+        order.clear_midtrans_snap_token()
+
+    base_id, retry_from_id = _split_midtrans_order_id(order)
+    base_id = base_id or _build_midtrans_base_id(order)
+    retry_index = order.midtrans_retry or retry_from_id or 0
+    candidate_order_id = _compose_midtrans_order_id(order, base_id, retry_index)
+
+    payload = _clone_payload(base_payload)
+    transaction_details = payload.get("transaction_details", {})
+    transaction_details["order_id"] = candidate_order_id
     transaction_details["gross_amount"] = _to_int_amount(order.total)
     payload["transaction_details"] = transaction_details
 
@@ -113,6 +155,9 @@ def get_or_create_snap_token(
     if not token:
         raise RuntimeError("Token Snap tidak tersedia.")
 
-    order.midtrans_token = token
-    order.save(update_fields=["midtrans_token"])
+    order.midtrans_order_id = candidate_order_id
+    order.midtrans_snap_token = token
+    order.midtrans_retry = retry_index + 1
+    order.save(update_fields=["midtrans_order_id", "midtrans_snap_token", "midtrans_retry"])
+
     return token, False

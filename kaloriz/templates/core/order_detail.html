@@ -441,12 +441,18 @@
             }
           });
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Gagal membuat token pembayaran.');
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (error) {
+            data = null;
           }
 
-          const data = await response.json();
+          if (!response.ok) {
+            const message = data && (data.message || data.error);
+            throw new Error(message || 'Gagal membuat token pembayaran.');
+          }
+
           const token = data && data.token;
           const reusedToken = Boolean(data && data.reused);
           if (!token) {

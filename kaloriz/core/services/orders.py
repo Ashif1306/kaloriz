@@ -65,9 +65,6 @@ def create_order_from_checkout(
         payment_deadline=timezone.now() + timedelta(hours=Order.PAYMENT_TIMEOUT_HOURS),
     )
 
-    # Pastikan ID Midtrans hanya dibuat satu kali untuk seluruh siklus pesanan
-    order.ensure_midtrans_order_id()
-
     Shipment.objects.create(
         order=order,
         full_name=shipping_full_name,
@@ -137,9 +134,9 @@ def cancel_order_due_to_timeout(order: Order) -> bool:
         if order.payment_deadline is None:
             order.payment_deadline = deadline
         update_fields = ["status", "payment_deadline"]
-        if order.midtrans_token:
-            order.midtrans_token = ""
-            update_fields.append("midtrans_token")
-        order.save(update_fields=update_fields)
+        if order.midtrans_snap_token:
+            order.midtrans_snap_token = None
+            update_fields.append("midtrans_snap_token")
+    order.save(update_fields=update_fields)
 
     return True

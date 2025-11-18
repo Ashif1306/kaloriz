@@ -1,6 +1,7 @@
 import uuid
 from decimal import Decimal
 from unittest import mock
+import uuid
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
@@ -67,66 +68,64 @@ class MidtransSnapTokenServiceTests(TestCase):
         default_kwargs.update(overrides)
         return Order.objects.create(**default_kwargs)
 
-    @mock.patch("payment.services.fetch_midtrans_transaction_status")
-    def test_reuses_existing_token_when_midtrans_status_pending(self, mock_status):
-        order = self._create_order()
-        order.ensure_midtrans_order_id()
-        order.midtrans_token = "existing-token"
-        order.save(update_fields=["midtrans_token"])
+    def _build_payload(self):
+        return {"transaction_details": {}, "item_details": [], "customer_details": {}}
 
-        mock_status.return_value = {"transaction_status": "pending"}
+    def test_reuses_existing_token_when_order_pending(self):
+        order = self._create_order(
+            midtrans_order_id="KALORIZ-1",
+            midtrans_snap_token="existing-token",
+            midtrans_retry=1,
+        )
+
         snap_client = mock.Mock()
-
         token, reused = get_or_create_snap_token(
             order=order,
             snap_client=snap_client,
-            transaction_payload={"transaction_details": {}},
+            base_payload=self._build_payload(),
         )
 
         self.assertEqual(token, "existing-token")
         self.assertTrue(reused)
         snap_client.create_transaction.assert_not_called()
 
-    @mock.patch("payment.services.fetch_midtrans_transaction_status")
-    def test_regenerates_order_id_when_previous_transaction_expired(self, mock_status):
-        order = self._create_order()
-        original_order_id = order.ensure_midtrans_order_id()
-        order.midtrans_token = "expired-token"
-        order.save(update_fields=["midtrans_token"])
-
-        mock_status.return_value = {"transaction_status": "expire"}
+    def test_generates_retry_suffix_when_requesting_new_token(self):
+        order = self._create_order(
+            midtrans_order_id="KALORIZ-1",
+            midtrans_retry=1,
+        )
         snap_client = mock.Mock()
         snap_client.create_transaction.return_value = {"token": "new-token"}
 
         token, reused = get_or_create_snap_token(
             order=order,
             snap_client=snap_client,
-            transaction_payload={"transaction_details": {}},
+            base_payload=self._build_payload(),
         )
 
         order.refresh_from_db()
         self.assertEqual(token, "new-token")
         self.assertFalse(reused)
-        self.assertEqual(order.midtrans_token, "new-token")
-        self.assertNotEqual(order.midtrans_order_id, original_order_id)
-        self.assertIn(Order.MIDTRANS_RETRY_SEPARATOR, order.midtrans_order_id)
+        self.assertTrue(order.midtrans_order_id.endswith(f"{Order.MIDTRANS_RETRY_SEPARATOR}1"))
+        self.assertEqual(order.midtrans_retry, 2)
+        self.assertEqual(order.midtrans_snap_token, "new-token")
         snap_client.create_transaction.assert_called_once()
 
-    def test_creates_token_when_one_does_not_exist(self):
+    def test_creates_token_with_base_id_when_first_time(self):
         order = self._create_order()
-        original_order_id = order.ensure_midtrans_order_id()
         snap_client = mock.Mock()
         snap_client.create_transaction.return_value = {"token": "fresh-token"}
 
         token, reused = get_or_create_snap_token(
             order=order,
             snap_client=snap_client,
-            transaction_payload={"transaction_details": {}},
+            base_payload=self._build_payload(),
         )
 
         order.refresh_from_db()
         self.assertEqual(token, "fresh-token")
         self.assertFalse(reused)
-        self.assertEqual(order.midtrans_token, "fresh-token")
-        self.assertEqual(order.midtrans_order_id, original_order_id)
+        self.assertIsNotNone(order.midtrans_order_id)
+        self.assertEqual(order.midtrans_retry, 1)
+        self.assertEqual(order.midtrans_snap_token, "fresh-token")
         snap_client.create_transaction.assert_called_once()
