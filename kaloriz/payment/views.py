@@ -26,7 +26,7 @@ from catalog.models import DiscountCode
 from core.models import Order, PaymentMethod
 from core.views import _get_active_cart, _prepare_selected_cart_items
 from core.services.orders import create_order_from_checkout, restore_order_stock, cancel_order_due_to_timeout
-from payment.services import get_or_create_midtrans_snap_token
+from payment.services import get_or_create_snap_token
 from shipping.models import Address
 
 logger = logging.getLogger(__name__)
@@ -737,7 +737,7 @@ def payment_create_snap_token(request):
                 "custom_field1": order.order_number,
             }
 
-            token, reused = get_or_create_midtrans_snap_token(
+            token, reused = get_or_create_snap_token(
                 order=order,
                 snap_client=snap_client,
                 transaction_payload=transaction_payload,
@@ -979,7 +979,7 @@ def payment_create_order_snap_token(request, order_number):
     }
 
     try:
-        token, reused = get_or_create_midtrans_snap_token(
+        token, reused = get_or_create_snap_token(
             order=order,
             snap_client=snap_client,
             transaction_payload=transaction_payload,
