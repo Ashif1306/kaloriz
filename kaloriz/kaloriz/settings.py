@@ -178,6 +178,11 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 MIDTRANS_IS_PRODUCTION = os.getenv('MIDTRANS_IS_PRODUCTION', 'False') == 'True'
 MIDTRANS_SERVER_KEY = os.getenv('MIDTRANS_SERVER_KEY', '')
 MIDTRANS_CLIENT_KEY = os.getenv('MIDTRANS_CLIENT_KEY', '')
+MIDTRANS_SNAP_JS_URL = (
+    "https://app.midtrans.com/snap/snap.js"
+    if MIDTRANS_IS_PRODUCTION
+    else "https://app.sandbox.midtrans.com/snap/snap.js"
+)
 MIDTRANS_PAYMENT_METHOD_SLUG = os.getenv('MIDTRANS_PAYMENT_METHOD_SLUG', 'midtrans').strip().lower()
 
 # DOKU configuration

@@ -498,7 +498,7 @@
 
 {% block extra_js %}
 {% if is_midtrans_payment %}
-<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ MIDTRANS_CLIENT_KEY }}"></script>
+<script src="{{ MIDTRANS_SNAP_JS_URL }}" data-client-key="{{ MIDTRANS_CLIENT_KEY }}"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const checkoutBtn = document.getElementById('btn-checkout');

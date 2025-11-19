@@ -580,6 +580,7 @@ def checkout_review(request):
         'discount_amount_raw': discount_amount,
         'total_raw': total,
         'MIDTRANS_CLIENT_KEY': settings.MIDTRANS_CLIENT_KEY,
+        'MIDTRANS_SNAP_JS_URL': settings.MIDTRANS_SNAP_JS_URL,
         'payment_create_snap_token_url': reverse('payment:create_snap_token'),
         'payment_finish_url': reverse('payment:finish'),
         'payment_create_doku_checkout_url': reverse('payment:create_doku_checkout'),
@@ -819,6 +820,7 @@ def order_detail(request, order_number):
             'payment:order_create_doku_checkout', args=[order.order_number]
         ),
         'MIDTRANS_CLIENT_KEY': settings.MIDTRANS_CLIENT_KEY,
+        'MIDTRANS_SNAP_JS_URL': settings.MIDTRANS_SNAP_JS_URL,
     }
     return render(request, 'core/order_detail.html', context)
 

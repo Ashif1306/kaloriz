@@ -361,7 +361,7 @@
   data-order-detail-url="{% url 'core:order_detail' order.order_number %}"
 ></div>
 {% if order.payment_method|lower == midtrans_payment_slug|lower %}
-<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ MIDTRANS_CLIENT_KEY }}"></script>
+<script src="{{ MIDTRANS_SNAP_JS_URL }}" data-client-key="{{ MIDTRANS_CLIENT_KEY }}"></script>
 {% endif %}
 <script>
   document.addEventListener('DOMContentLoaded', function () {
