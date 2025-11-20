@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import Category, Product, Testimonial, DiscountCode
 
@@ -13,9 +14,10 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'discount_price', 'stock', 'weight_gram', 'is_fragile', 'is_perishable', 'available', 'created_at']
-    list_filter = ['available', 'is_fragile', 'is_perishable', 'category', 'created_at']
-    list_editable = ['price', 'discount_price', 'stock', 'available']
+    list_display = ['favorite_star', 'is_featured', 'name', 'category', 'price', 'discount_price', 'stock', 'weight_gram', 'is_fragile', 'is_perishable', 'available', 'created_at']
+    list_filter = ['available', 'is_featured', 'is_fragile', 'is_perishable', 'category', 'created_at']
+    list_editable = ['price', 'discount_price', 'stock', 'available', 'is_featured']
+    list_display_links = ('name',)
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name', 'description']
     date_hierarchy = 'created_at'
@@ -32,6 +34,9 @@ class ProductAdmin(admin.ModelAdmin):
                 'is_fragile', 'is_perishable',
             )
         }),
+        ('Label', {
+            'fields': ('is_featured',),
+        }),
         ('Informasi Nutrisi', {
             'fields': (
                 'calories', 'protein', 'fat', 'carbohydrates', 'vitamins', 'fiber'
@@ -41,6 +46,17 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('image',)
         }),
     )
+
+    @admin.display(description='Favorit', ordering='is_featured')
+    def favorite_star(self, obj):
+        star_color = '#f7c32e' if obj.is_featured else '#d6d6d6'
+        star_icon = '★' if obj.is_featured else '☆'
+        return format_html(
+            '<span style="color: {}; font-size: 18px;" aria-label="{}">{}</span>',
+            star_color,
+            'Favorit' if obj.is_featured else 'Bukan favorit',
+            star_icon,
+        )
 
 
 @admin.register(Testimonial)

@@ -23,7 +23,10 @@ def _get_watchlisted_product_ids(request):
 
 def home(request):
     """Homepage with featured products"""
-    featured_products = Product.objects.filter(available=True)[:8]
+    featured_products = Product.objects.filter(
+        available=True,
+        is_featured=True,
+    )[:8]
     categories = Category.objects.all()[:6]
 
     context = {

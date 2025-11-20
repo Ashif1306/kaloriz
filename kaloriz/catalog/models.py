@@ -122,6 +122,12 @@ class Product(models.Model):
         help_text="Mudah rusak (opsional)"
     )
 
+    is_featured = models.BooleanField(
+        default=False,
+        verbose_name="Favorit",
+        help_text="Tampilkan produk ini sebagai produk unggulan di beranda",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
