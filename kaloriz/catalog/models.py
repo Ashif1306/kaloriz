@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
@@ -187,6 +188,14 @@ class Testimonial(models.Model):
         (5, '5 Stars'),
     ]
 
+    order = models.ForeignKey(
+        'core.Order',
+        on_delete=models.CASCADE,
+        related_name='testimonials',
+        verbose_name="Pesanan",
+        null=True,
+        blank=True,
+    )
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='testimonials', verbose_name="Produk")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='testimonials', verbose_name="Pengguna")
     rating = models.IntegerField(choices=RATING_CHOICES, verbose_name="Rating")
@@ -200,6 +209,13 @@ class Testimonial(models.Model):
         verbose_name = "Testimoni"
         verbose_name_plural = "Testimoni"
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['order', 'product', 'user'],
+                name='unique_testimonial_per_order_product_user',
+                condition=Q(order__isnull=False),
+            )
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.product.name}"

@@ -256,7 +256,100 @@
                 <td class="align-middle text-center qty-col" data-label="Jumlah">{{ item.quantity }}</td>
                 <td class="align-middle text-center subtotal-col" data-label="Subtotal (Rp)"><strong>{{ item.subtotal|dot_separator }}</strong></td>
                 <td class="align-middle rating-col" data-label="Penilaian">
-                  <span class="text-muted d-inline-block rating-text">Belum<br>tersedia.</span>
+                  {% if order.status == 'delivered' %}
+                    {% if item.existing_testimonial %}
+                      <span class="text-success d-inline-block rating-text">Sudah dinilai</span>
+                    {% elif item.product %}
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        data-toggle="modal"
+                        data-target="#reviewModal{{ item.id }}"
+                      >
+                        Beri Penilaian
+                      </button>
+
+                      <div
+                        class="modal fade"
+                        id="reviewModal{{ item.id }}"
+                        tabindex="-1"
+                        role="dialog"
+                        aria-labelledby="reviewModalLabel{{ item.id }}"
+                        aria-hidden="true"
+                      >
+                        <div class="modal-dialog" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="reviewModalLabel{{ item.id }}">Beri Penilaian</h5>
+                              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                              </button>
+                            </div>
+                            <form
+                              method="post"
+                              action="{% url 'core:create_review' order_item_id=item.id %}"
+                              enctype="multipart/form-data"
+                            >
+                              {% csrf_token %}
+                              <div class="modal-body">
+                                <div class="form-group mb-3">
+                                  <label class="mb-1">Produk</label>
+                                  <input
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    value="{{ item.product_name }}"
+                                    readonly
+                                  >
+                                </div>
+                                <div class="form-group mb-3">
+                                  <label class="mb-1" for="rating-{{ item.id }}">Rating</label>
+                                  <select
+                                    class="custom-select custom-select-sm"
+                                    id="rating-{{ item.id }}"
+                                    name="rating"
+                                    required
+                                  >
+                                    {% for value, label in testimonial_form.fields.rating.choices %}
+                                      <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                  </select>
+                                </div>
+                                <div class="form-group mb-3">
+                                  <label class="mb-1" for="review-{{ item.id }}">Ulasan</label>
+                                  <textarea
+                                    class="form-control form-control-sm"
+                                    id="review-{{ item.id }}"
+                                    name="review"
+                                    rows="3"
+                                    placeholder="Ceritakan pengalaman Anda menggunakan produk ini"
+                                    required
+                                  ></textarea>
+                                </div>
+                                <div class="form-group mb-0">
+                                  <label class="mb-1" for="photo-{{ item.id }}">Foto (Opsional)</label>
+                                  <input
+                                    type="file"
+                                    class="form-control-file"
+                                    id="photo-{{ item.id }}"
+                                    name="photo"
+                                    accept="image/*"
+                                  >
+                                </div>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Batal</button>
+                                <button type="submit" class="btn btn-primary">Kirim</button>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    {% else %}
+                      <span class="text-muted d-inline-block rating-text">Produk<br>tidak tersedia.</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-muted d-inline-block rating-text">Belum<br>tersedia.</span>
+                  {% endif %}
                 </td>
               </tr>
               {% endfor %}

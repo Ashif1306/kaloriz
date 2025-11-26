@@ -792,12 +792,15 @@ def order_detail(request, order_number):
 
     testimonials = Testimonial.objects.filter(
         user=request.user,
+        order=order,
         product_id__in=product_ids,
     )
-    testimonials_map = {testimonial.product_id: testimonial for testimonial in testimonials}
+    testimonials_map = {
+        (testimonial.product_id, testimonial.order_id): testimonial for testimonial in testimonials
+    }
 
     for item in order_items:
-        item.existing_testimonial = testimonials_map.get(item.product_id)
+        item.existing_testimonial = testimonials_map.get((item.product_id, order.id))
 
     payment_is_pending = order.status == 'pending' and bool(order.payment_method)
     payment_is_active = payment_is_pending and not order.is_payment_overdue()
@@ -826,22 +829,21 @@ def order_detail(request, order_number):
 
 
 @login_required
-def submit_testimonial(request, order_number, item_id):
+def create_review(request, order_item_id):
     """Allow a customer to submit a testimonial for a purchased product."""
 
-    order = get_object_or_404(
-        Order.objects.prefetch_related('items__product'),
-        order_number=order_number,
-        user=request.user,
+    order_item = get_object_or_404(
+        OrderItem.objects.select_related('order', 'product'),
+        pk=order_item_id,
+        order__user=request.user,
     )
 
-    order_items_qs = order.items.select_related('product')
-    order_item = get_object_or_404(order_items_qs, pk=item_id)
+    order_number = order_item.order.order_number
 
     if request.method != 'POST':
         return redirect('core:order_detail', order_number=order_number)
 
-    if order.status != 'delivered':
+    if order_item.order.status != 'delivered':
         messages.warning(request, 'Penilaian hanya dapat diberikan untuk pesanan yang telah selesai.')
         return redirect('core:order_detail', order_number=order_number)
 
@@ -849,8 +851,12 @@ def submit_testimonial(request, order_number, item_id):
         messages.error(request, 'Produk ini sudah tidak tersedia sehingga tidak dapat dinilai.')
         return redirect('core:order_detail', order_number=order_number)
 
-    if Testimonial.objects.filter(user=request.user, product=order_item.product).exists():
-        messages.info(request, 'Anda sudah memberikan penilaian untuk produk ini.')
+    if Testimonial.objects.filter(
+        user=request.user,
+        order=order_item.order,
+        product=order_item.product,
+    ).exists():
+        messages.info(request, 'Anda sudah memberikan penilaian untuk produk ini pada pesanan ini.')
         return redirect('core:order_detail', order_number=order_number)
 
     form = TestimonialForm(request.POST, request.FILES)
@@ -859,6 +865,7 @@ def submit_testimonial(request, order_number, item_id):
         testimonial = form.save(commit=False)
         testimonial.user = request.user
         testimonial.product = order_item.product
+        testimonial.order = order_item.order
         testimonial.is_approved = True
         testimonial.save()
         messages.success(request, 'Terima kasih! Penilaian Anda telah dikirim dan langsung ditampilkan.')

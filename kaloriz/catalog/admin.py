@@ -61,16 +61,16 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Testimonial)
 class TestimonialAdmin(admin.ModelAdmin):
-    list_display = ['user', 'product', 'rating', 'is_approved', 'created_at']
+    list_display = ['user', 'product', 'order', 'rating', 'is_approved', 'created_at']
     list_filter = ['is_approved', 'rating', 'created_at']
-    search_fields = ['user__username', 'product__name', 'review']
+    search_fields = ['user__username', 'product__name', 'order__order_number', 'review']
     readonly_fields = ['created_at', 'updated_at']
     list_editable = ['is_approved']
     date_hierarchy = 'created_at'
 
     fieldsets = (
         ('Informasi Testimoni', {
-            'fields': ('product', 'user', 'rating', 'review', 'photo', 'is_approved')
+            'fields': ('product', 'order', 'user', 'rating', 'review', 'photo', 'is_approved')
         }),
         ('Timestamp', {
             'fields': ('created_at', 'updated_at')
