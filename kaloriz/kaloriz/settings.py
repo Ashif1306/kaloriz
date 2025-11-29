@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sitemaps",
     "whitenoise.runserver_nostatic",
     "core",
     "catalog",
@@ -152,6 +153,15 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Basic site metadata used for SEO defaults
+SITE_NAME = os.getenv("SITE_NAME", "Kaloriz")
+SITE_DESCRIPTION = os.getenv(
+    "SITE_DESCRIPTION",
+    "Kaloriz - Toko online makanan sehat dengan informasi nutrisi jelas.",
+)
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
+SITE_LOGO = os.getenv("SITE_LOGO", "/static/images/logo.png")
 
 # Email Configuration
 # For development: emails will be printed to console

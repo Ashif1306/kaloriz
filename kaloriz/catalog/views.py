@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -33,6 +34,9 @@ def home(request):
         'featured_products': featured_products,
         'categories': categories,
         'watchlisted_product_ids': _get_watchlisted_product_ids(request),
+        'meta_title': 'Kaloriz - Toko Makanan Sehat',
+        'meta_description': 'Belanja makanan sehat, praktis, dan bergizi di Kaloriz dengan informasi nutrisi lengkap.',
+        'meta_url': request.build_absolute_uri(),
     }
     return render(request, 'catalog/home.html', context)
 
@@ -75,6 +79,9 @@ def product_list(request):
         'current_category': category_slug,
         'search_query': search_query,
         'watchlisted_product_ids': _get_watchlisted_product_ids(request),
+        'meta_title': 'Daftar Produk - Kaloriz',
+        'meta_description': 'Jelajahi semua produk Kaloriz lengkap dengan pilihan kategori dan filter harga.',
+        'meta_url': request.build_absolute_uri(),
     }
     return render(request, 'catalog/product_list.html', context)
 
@@ -101,6 +108,10 @@ def product_detail(request, slug):
         'testimonials': testimonials,
         'watchlisted_product_ids': watchlisted_ids,
         'is_product_watchlisted': product.id in watchlisted_ids,
+        'meta_title': f"{product.name} - Kaloriz",
+        'meta_description': product.description[:150],
+        'meta_image': request.build_absolute_uri(product.image.url) if product.image else request.build_absolute_uri(getattr(settings, "SITE_LOGO", "/static/images/logo.png")),
+        'meta_url': request.build_absolute_uri(product.get_absolute_url()),
     }
     return render(request, 'catalog/product_detail.html', context)
 
@@ -114,6 +125,9 @@ def category_detail(request, slug):
         'category': category,
         'products': products,
         'watchlisted_product_ids': _get_watchlisted_product_ids(request),
+        'meta_title': f"{category.name} - Kaloriz",
+        'meta_description': category.description[:150] if category.description else f"Produk dalam kategori {category.name} di Kaloriz.",
+        'meta_url': request.build_absolute_uri(category.get_absolute_url()),
     }
     return render(request, 'catalog/category_detail.html', context)
 
@@ -134,13 +148,24 @@ def search(request):
         'products': products,
         'query': query,
         'watchlisted_product_ids': _get_watchlisted_product_ids(request),
+        'meta_title': f"Hasil pencarian '{query}' - Kaloriz" if query else 'Pencarian Produk - Kaloriz',
+        'meta_description': 'Cari produk Kaloriz dengan kata kunci favoritmu.',
+        'meta_url': request.build_absolute_uri(),
     }
     return render(request, 'catalog/search_results.html', context)
 
 
 def about(request):
     """About us page"""
-    return render(request, 'catalog/about.html')
+    return render(
+        request,
+        'catalog/about.html',
+        {
+            'meta_title': 'Tentang Kaloriz',
+            'meta_description': 'Kenali Kaloriz, toko online makanan sehat yang praktis dan bergizi.',
+            'meta_url': request.build_absolute_uri(),
+        },
+    )
 
 
 def contact(request):
@@ -164,7 +189,15 @@ def contact(request):
 
         return redirect('catalog:contact')
 
-    return render(request, 'catalog/contact.html')
+    return render(
+        request,
+        'catalog/contact.html',
+        {
+            'meta_title': 'Kontak Kaloriz',
+            'meta_description': 'Hubungi tim Kaloriz untuk pertanyaan atau dukungan pelanggan.',
+            'meta_url': request.build_absolute_uri(),
+        },
+    )
 
 
 def _format_rupiah(value):

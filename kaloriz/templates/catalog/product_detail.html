@@ -3,6 +3,27 @@
 
 {% block title %}{{ product.name }} - Kaloriz{% endblock %}
 
+{% block jsonld %}
+{{ block.super }}
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "{{ product.name }}",
+    "description": "{{ product.description|striptags|truncatechars:200 }}",
+    "image": ["{{ meta_image }}"],
+    "sku": "{{ product.id }}",
+    "url": "{{ meta_url }}",
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "IDR",
+      "price": "{{ product.get_display_price }}",
+      "availability": "https://schema.org/{% if product.available %}InStock{% else %}OutOfStock{% endif %}"
+    }
+  }
+</script>
+{% endblock %}
+
 {% block content %}
 <style>
   .product-detail-image-card {
