@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load price_filters nutrition_tags %}
 
 {% block title %}{{ product.name }} - Kaloriz{% endblock %}
@@ -71,6 +72,17 @@
   .wishlist-btn.is-active .fa-heart,
   .wishlist-btn:hover .fa-heart {
     color: #dc2220;
+  }
+
+  .flash-countdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(255, 193, 7, 0.15);
+    color: #b7791f;
+    font-weight: 600;
   }
 
   .info-card {
@@ -295,7 +307,9 @@
     <div class="col-md-7">
       <h1 class="mb-3">{{ product.name }}</h1>
 
-      {% if product.is_on_sale %}
+      {% if product.is_flash_sale_active %}
+        <span class="badge badge-warning badge-lg mb-3"><i class="fas fa-bolt"></i> Flash Sale</span>
+      {% elif product.is_on_sale %}
         <span class="badge badge-danger badge-lg mb-3">Diskon {{ product.get_discount_percentage }}%</span>
       {% endif %}
 
@@ -308,7 +322,19 @@
 
       <!-- Price -->
       <div class="mb-4">
-        {% if product.is_on_sale %}
+        {% if product.is_flash_sale_active %}
+          <h4 class="text-muted"><s>Rp {{ product.price|dot_separator }}</s></h4>
+          <h2 class="text-warning font-weight-bold">Rp {{ product.get_display_price|dot_separator }}</h2>
+          <div class="flash-countdown">
+            <i class="far fa-clock"></i>
+            <span
+              id="flash-sale-timer"
+              data-end-time="{{ flash_sale_end|date:'c' }}"
+            >
+              Memuat waktu...
+            </span>
+          </div>
+        {% elif product.is_on_sale %}
           <h4 class="text-muted"><s>Rp {{ product.price|dot_separator }}</s></h4>
           <h2 class="text-danger font-weight-bold">Rp {{ product.get_display_price|dot_separator }}</h2>
         {% else %}
@@ -836,7 +862,48 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/flash_sale.js' %}"></script>
 <script>
+(function() {
+  const timerEl = document.getElementById('flash-sale-timer');
+  if (!timerEl) return;
+
+  const endIso = timerEl.dataset.endTime;
+  if (!endIso) return;
+
+  function formatTime(diffMs) {
+    const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  const endTime = new Date(endIso);
+
+  function updateTimer() {
+    const now = new Date();
+    const diff = endTime - now;
+
+    if (isNaN(diff)) {
+      timerEl.textContent = 'Tidak valid';
+      return;
+    }
+
+    if (diff <= 0) {
+      timerEl.textContent = 'Flash sale berakhir';
+      clearInterval(intervalId);
+      return;
+    }
+
+    timerEl.textContent = formatTime(diff);
+  }
+
+  updateTimer();
+  const intervalId = setInterval(updateTimer, 1000);
+})();
+
 // Quantity Controls
 function increaseQty(maxStock) {
   const qtyInput = document.getElementById('quantity');

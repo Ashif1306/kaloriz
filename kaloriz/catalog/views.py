@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -6,10 +7,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.http import JsonResponse
+from django.utils import timezone
 from django.utils.formats import number_format
 from django.views.decorators.http import require_POST
 
-from core.models import Cart
+from core.models import Cart, Order
+from shipping.models import District
 
 from .models import Product, Category, Testimonial, DiscountCode
 
@@ -24,14 +27,33 @@ def _get_watchlisted_product_ids(request):
 
 def home(request):
     """Homepage with featured products"""
+    now = timezone.now()
     featured_products = Product.objects.filter(
         available=True,
         is_featured=True,
     )[:8]
+    flash_sale_products = Product.objects.filter(
+        available=True,
+        is_flash_sale=True,
+        flash_sale_price__isnull=False,
+        flash_sale_start__lte=now,
+    ).filter(
+        Q(flash_sale_end__gte=now) | Q(flash_sale_end__isnull=True, flash_sale_duration_hours__gt=0)
+    )[:8]
+    available_products_count = Product.objects.filter(
+        stock__gt=0,
+        available=True,
+    ).count()
+    happy_customers_count = Testimonial.objects.filter(
+        rating__isnull=False,
+    ).count()
     categories = Category.objects.all()[:6]
 
     context = {
         'featured_products': featured_products,
+        'flash_sale_products': flash_sale_products,
+        'available_products_count': available_products_count,
+        'happy_customers_count': happy_customers_count,
         'categories': categories,
         'watchlisted_product_ids': _get_watchlisted_product_ids(request),
         'meta_title': 'Kaloriz - Toko Makanan Sehat',
@@ -108,6 +130,7 @@ def product_detail(request, slug):
         'testimonials': testimonials,
         'watchlisted_product_ids': watchlisted_ids,
         'is_product_watchlisted': product.id in watchlisted_ids,
+        'flash_sale_end': product.flash_sale_end,
         'meta_title': f"{product.name} - Kaloriz",
         'meta_description': product.description[:150],
         'meta_image': request.build_absolute_uri(product.image.url) if product.image else request.build_absolute_uri(getattr(settings, "SITE_LOGO", "/static/images/logo.png")),
@@ -157,6 +180,16 @@ def search(request):
 
 def about(request):
     """About us page"""
+    start_date = date(2025, 9, 1)
+    today = timezone.localdate()
+
+    experienced_days = (today - start_date).days
+    happy_customers_count = Testimonial.objects.filter(
+        rating__isnull=False,
+    ).count()
+    successful_orders_count = Order.objects.exclude(status='cancelled').count()
+    district_coverage_count = District.objects.count()
+
     return render(
         request,
         'catalog/about.html',
@@ -164,6 +197,10 @@ def about(request):
             'meta_title': 'Tentang Kaloriz',
             'meta_description': 'Kenali Kaloriz, toko online makanan sehat yang praktis dan bergizi.',
             'meta_url': request.build_absolute_uri(),
+            'experienced_days': experienced_days,
+            'happy_customers_count': happy_customers_count,
+            'successful_orders_count': successful_orders_count,
+            'district_coverage_count': district_coverage_count,
         },
     )
 

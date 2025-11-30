@@ -22,11 +22,15 @@
       <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
         <div class="modern-product-card">
           <!-- Discount Badge - Top Left -->
-          {% if product.is_on_sale %}
-          <div class="discount-badge">
-            -{{ product.get_discount_percentage }}%
-          </div>
-          {% endif %}
+        {% if product.is_flash_sale_active %}
+        <div class="discount-badge flash-badge">
+          <i class="fas fa-bolt"></i> Flash Sale
+        </div>
+        {% elif product.is_on_sale %}
+        <div class="discount-badge">
+          -{{ product.get_discount_percentage }}%
+        </div>
+        {% endif %}
 
           <!-- Wishlist Icon - Top Right -->
         <div class="wishlist-icon" onclick="event.stopPropagation();">
@@ -64,12 +68,15 @@
 
             <!-- Price -->
             <div class="product-price">
-              {% if product.is_on_sale %}
-                <span class="price-original">Rp {{ product.price|dot_separator }}</span>
-                <span class="price-sale">Rp {{ product.get_display_price|dot_separator }}</span>
-              {% else %}
-                <span class="price-sale">Rp {{ product.price|dot_separator }}</span>
-              {% endif %}
+            {% if product.is_flash_sale_active %}
+              <span class="price-original">Rp {{ product.price|dot_separator }}</span>
+              <span class="price-sale price-flash">Rp {{ product.get_display_price|dot_separator }}</span>
+            {% elif product.is_on_sale %}
+              <span class="price-original">Rp {{ product.price|dot_separator }}</span>
+              <span class="price-sale">Rp {{ product.get_display_price|dot_separator }}</span>
+            {% else %}
+              <span class="price-sale">Rp {{ product.price|dot_separator }}</span>
+            {% endif %}
             </div>
           </div>
 
@@ -145,6 +152,13 @@
   font-size: 0.85rem;
   z-index: 2;
   box-shadow: 0 2px 8px rgba(255, 65, 108, 0.4);
+}
+
+.flash-badge {
+  background: linear-gradient(135deg, #ff9a3c, #ff5f6d);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Wishlist Icon - Top Right */
@@ -277,6 +291,10 @@
   color: #28a745;
   font-size: 1.2rem;
   font-weight: bold;
+}
+
+.price-flash {
+  color: #ff5722;
 }
 
 /* Cart Button - Bottom Right */

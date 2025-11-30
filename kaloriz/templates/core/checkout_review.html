@@ -74,7 +74,12 @@
               <li class="checkout-item d-flex justify-content-between align-items-start py-3">
                 <div class="pr-3">
                   <div class="font-weight-semibold">{{ item.product.name }}</div>
-                  <div class="text-muted small">{{ item.quantity }} x Rp {{ item.product.get_display_price|floatformat:0 }}</div>
+                  <div class="text-muted small">
+                    {% if item.product.is_flash_sale_active %}
+                      <s>Rp {{ item.product.price|floatformat:0 }}</s> →
+                    {% endif %}
+                    {{ item.quantity }} x Rp {{ item.product.get_display_price|floatformat:0 }}
+                  </div>
                 </div>
                 <div class="text-right font-weight-semibold">Rp {{ item.get_subtotal|floatformat:0 }}</div>
               </li>

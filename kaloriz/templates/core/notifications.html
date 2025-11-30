@@ -14,19 +14,26 @@
   {% if notifications %}
     <div class="profile-notification-list">
       {% for notification in notifications %}
-      <div class="notification-card notification-{{ notification.level|default:'info' }}">
+      <div class="notification-card {% if not notification.is_read %}notification-unread{% endif %}">
         <div class="notification-icon">
-          <i class="{{ notification.icon|default:'fas fa-bell' }}"></i>
+          <i class="fas fa-bell"></i>
         </div>
         <div class="notification-content">
           <div class="notification-header">
             <h4>{{ notification.title }}</h4>
-            <span class="notification-time">{{ notification.timestamp|default:'' }}</span>
+            <span class="notification-time">{{ notification.created_at|date:"d M Y, H:i" }}</span>
           </div>
           <p>{{ notification.message }}</p>
-          {% if notification.action_url %}
-          <a href="{{ notification.action_url }}" class="btn btn-primary btn-sm">{{ notification.action_label|default:'Lihat detail' }}</a>
-          {% endif %}
+          <div class="notification-actions">
+            {% if notification.is_read %}
+              <span class="badge badge-secondary">Sudah dibaca</span>
+            {% else %}
+              <form method="post" action="{% url 'core:notification_mark_read' notification.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-sm">Tandai sebagai dibaca</button>
+              </form>
+            {% endif %}
+          </div>
         </div>
       </div>
       {% endfor %}

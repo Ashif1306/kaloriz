@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from decimal import Decimal, InvalidOperation
 
@@ -17,6 +18,7 @@ from django.urls import reverse
 from .models import (
     Cart,
     CartItem,
+    Notification,
     Order,
     OrderItem,
     PaymentMethod,
@@ -34,6 +36,9 @@ from shipping.forms import AddressForm
 
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_active_cart(request):
@@ -143,6 +148,74 @@ def add_to_cart(request, product_id):
         return JsonResponse({
             'success': True,
             'message': 'Produk berhasil ditambahkan ke keranjang.',
+            'cart_count': cart.items.count(),
+        })
+
+    messages.success(request, success_message)
+    return redirect('core:cart')
+
+
+@require_POST
+def flash_sale_buy_now(request, slug):
+    """Add a single flash sale product to cart and select only that item."""
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    referer = request.META.get('HTTP_REFERER') or reverse('catalog:product_list')
+
+    if not request.user.is_authenticated:
+        message = "Silakan login terlebih dahulu untuk membeli produk flash sale."
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': message}, status=401)
+        messages.error(request, message)
+        return redirect(f"{reverse('core:login')}?next={request.path}")
+
+    try:
+        product = Product.objects.get(slug=slug, available=True)
+    except Product.DoesNotExist:
+        message = "Produk flash sale tidak ditemukan atau sudah tidak tersedia."
+        logger.warning("Flash sale product missing", extra={"slug": slug})
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': message}, status=404)
+        messages.error(request, message)
+        return redirect(referer)
+
+    if not product.is_flash_sale_active:
+        message = "Flash sale untuk produk ini sudah berakhir atau belum dimulai."
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': message}, status=400)
+        messages.error(request, message)
+        return redirect(referer)
+
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+
+    try:
+        # Unselect all items before selecting the flash sale product
+        cart.items.update(is_selected=False)
+
+        # Add or update the targeted item
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            defaults={'quantity': 1}
+        )
+
+        if not created:
+            cart_item.quantity = 1
+
+        cart_item.is_selected = True
+        cart_item.save()
+    except Exception:
+        logger.exception("Failed to process flash sale buy now", extra={"product_id": product.id})
+        message = "Gagal menambahkan produk ke checkout cepat. Silakan coba lagi."
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': message}, status=500)
+        messages.error(request, message)
+        return redirect(referer)
+
+    success_message = f"{product.name} ditambahkan ke keranjang untuk checkout cepat."
+    if is_ajax:
+        return JsonResponse({
+            'success': True,
+            'message': success_message,
             'cart_count': cart.items.count(),
         })
 
@@ -1240,9 +1313,9 @@ def watchlist_view(request):
 
 @login_required
 def notifications_view(request):
-    """Display user notifications placeholder"""
+    """Display user notifications sorted by newest first"""
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    notifications = []
+    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
 
     context = {
         'profile': profile,
@@ -1250,6 +1323,18 @@ def notifications_view(request):
         'active_tab': 'notifications',
     }
     return render(request, 'core/notifications.html', context)
+
+
+@login_required
+@require_POST
+def mark_notification_as_read(request, notification_id):
+    """Mark a single notification as read for the logged-in user"""
+    notification = get_object_or_404(Notification, pk=notification_id, user=request.user)
+    if not notification.is_read:
+        notification.is_read = True
+        notification.save(update_fields=['is_read'])
+        messages.success(request, 'Notifikasi ditandai sebagai dibaca.')
+    return redirect('core:notifications')
 
 
 @login_required

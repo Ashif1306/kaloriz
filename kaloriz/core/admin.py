@@ -9,6 +9,7 @@ from .models import (
     UserProfile,
     Watchlist,
     EmailVerification,
+    Notification,
 )
 
 admin.site.site_header = "Kaloriz Admin"
@@ -176,5 +177,14 @@ class EmailVerificationAdmin(admin.ModelAdmin):
     list_display = ['user', 'code', 'created_at', 'expires_at', 'is_used', 'ip_address']
     list_filter = ['is_used', 'created_at']
     search_fields = ['user__username', 'user__email', 'code']
+    readonly_fields = ['created_at']
+    date_hierarchy = 'created_at'
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['title', 'user', 'is_read', 'created_at']
+    list_filter = ['is_read', 'created_at']
+    search_fields = ['title', 'message', 'user__username', 'user__email']
     readonly_fields = ['created_at']
     date_hierarchy = 'created_at'

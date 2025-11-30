@@ -7,8 +7,7 @@ import random
 from datetime import timedelta
 from django.utils import timezone
 from django.utils.text import slugify
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper
-from django.db.models.functions import Coalesce
+from django.db.models import Sum
 
 
 class PaymentMethod(models.Model):
@@ -91,13 +90,9 @@ class Cart(models.Model):
 
     def get_selected_total(self):
         """Calculate total price of selected items only"""
-        price_expression = Coalesce('product__discount_price', 'product__price')
-        line_total = ExpressionWrapper(
-            F('quantity') * price_expression,
-            output_field=DecimalField(max_digits=12, decimal_places=2),
+        return sum(
+            item.get_subtotal() for item in self.items.filter(is_selected=True)
         )
-        total = self.items.filter(is_selected=True).aggregate(total=Sum(line_total))['total']
-        return total or Decimal('0')
 
     def get_total_items(self):
         """Get total number of items in cart"""
@@ -495,3 +490,19 @@ class EmailVerification(models.Model):
         """Mark verification code as used"""
         self.is_used = True
         self.save()
+
+
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications", verbose_name="Pengguna")
+    title = models.CharField(max_length=255, verbose_name="Judul")
+    message = models.TextField(verbose_name="Pesan")
+    is_read = models.BooleanField(default=False, verbose_name="Sudah dibaca")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Dibuat")
+
+    class Meta:
+        verbose_name = "Notifikasi"
+        verbose_name_plural = "Notifikasi"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} - {self.user.username}"

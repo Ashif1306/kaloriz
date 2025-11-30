@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.formats import number_format
 from decimal import Decimal, InvalidOperation
+from datetime import timedelta
 
 class Category(models.Model):
     name = models.CharField(max_length=200, unique=True, verbose_name="Nama Kategori")
@@ -129,6 +130,36 @@ class Product(models.Model):
         help_text="Tampilkan produk ini sebagai produk unggulan di beranda",
     )
 
+    # === FLASH SALE ===
+    is_flash_sale = models.BooleanField(
+        default=False,
+        verbose_name="Aktifkan Flash Sale",
+        help_text="Centang untuk menjadikan produk ini bagian dari Flash Sale",
+    )
+    flash_sale_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Harga Flash Sale",
+    )
+    flash_sale_start = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Mulai Flash Sale",
+    )
+    flash_sale_duration_hours = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Durasi (Jam)",
+        help_text="Durasi Flash Sale dalam jam (mis. 1, 3, 6)",
+    )
+    flash_sale_end = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Berakhir Flash Sale",
+        help_text="Diisi otomatis berdasarkan durasi",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -150,6 +181,8 @@ class Product(models.Model):
                 unique_slug = f"{base_slug}-{counter}"
                 counter += 1
             self.slug = unique_slug
+
+        self.flash_sale_end = self.calculate_flash_sale_end()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -158,18 +191,44 @@ class Product(models.Model):
     def get_absolute_url(self):
         return reverse('catalog:product_detail', args=[self.slug])
 
+    @property
+    def is_flash_sale_active(self):
+        """Return True if flash sale is active at current time"""
+        if not (self.is_flash_sale and self.flash_sale_price):
+            return False
+
+        if not self.flash_sale_start:
+            return False
+
+        end_time = self.flash_sale_end or self.calculate_flash_sale_end()
+        if not end_time:
+            return False
+
+        now = timezone.now()
+        return self.flash_sale_start <= now <= end_time
+
+    def calculate_flash_sale_end(self):
+        if self.flash_sale_start and self.flash_sale_duration_hours:
+            return self.flash_sale_start + timedelta(hours=self.flash_sale_duration_hours)
+        return None
+
     def get_display_price(self):
-        """Return discount price if available, otherwise regular price"""
-        return self.discount_price if self.discount_price else self.price
+        """Return the active price considering flash sale or discount"""
+        if self.is_flash_sale_active:
+            return self.flash_sale_price
+        if self.discount_price:
+            return self.discount_price
+        return self.price
 
     def is_on_sale(self):
-        """Check if product has a discount"""
-        return self.discount_price is not None and self.discount_price < self.price
+        """Check if product has a discount (flash sale or standard discount)"""
+        return self.get_display_price() < self.price
 
     def get_discount_percentage(self):
-        """Calculate discount percentage"""
-        if self.is_on_sale():
-            return int(((self.price - self.discount_price) / self.price) * 100)
+        """Calculate discount percentage based on the active price"""
+        display_price = self.get_display_price()
+        if display_price < self.price:
+            return int(((self.price - display_price) / self.price) * 100)
         return 0
 
     def has_nutrition_info(self):

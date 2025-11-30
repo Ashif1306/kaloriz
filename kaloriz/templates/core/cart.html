@@ -46,7 +46,18 @@
                     </div>
                   </td>
 
-                  <td class="price-cell" data-label="Harga">Rp {{ item.product.get_display_price|floatformat:0 }}</td>
+                  <td class="price-cell" data-label="Harga">
+                    {% if item.product.is_flash_sale_active %}
+                      <div class="text-muted small"><s>Rp {{ item.product.price|floatformat:0 }}</s></div>
+                      <div class="text-warning font-weight-bold">Rp {{ item.product.get_display_price|floatformat:0 }}</div>
+                      <div class="badge badge-warning mt-1">Flash Sale</div>
+                    {% elif item.product.is_on_sale %}
+                      <div class="text-muted small"><s>Rp {{ item.product.price|floatformat:0 }}</s></div>
+                      <div class="text-danger font-weight-bold">Rp {{ item.product.get_display_price|floatformat:0 }}</div>
+                    {% else %}
+                      Rp {{ item.product.price|floatformat:0 }}
+                    {% endif %}
+                  </td>
 
                   <td class="qty-col" data-label="Jumlah">
                     <form method="post" action="{% url 'core:update_cart_item' item.id %}" class="qty-form">
