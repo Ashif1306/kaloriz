@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sitemaps",
+    "django.contrib.sites",
     "whitenoise.runserver_nostatic",
     "core",
     "catalog",
@@ -164,27 +165,28 @@ SITE_DESCRIPTION = os.getenv(
 )
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 SITE_LOGO = os.getenv("SITE_LOGO", "/static/images/logo.png")
-
-# Email Configuration
-# For development: emails will be printed to console
-
+SITE_DOMAIN = os.getenv("SITE_DOMAIN", "www.kaloriz.store")
+SITE_SCHEME = os.getenv("SITE_SCHEME", "https")
+SITE_ID = int(os.getenv("SITE_ID", 1))
 
 # =========================
 # EMAIL (SMTP) CONFIG
 # =========================
-# =========================
-# EMAIL (SMTP) CONFIG
-# =========================
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False') == 'True'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'kaloriz64@gmail.com')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')  # wajib terisi (App Password TANPA spasi)
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
-ADMIN_CONTACT_EMAIL = os.getenv('ADMIN_CONTACT_EMAIL', 'kaloriz64@gmail.com')
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False") == "True"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+ADMIN_CONTACT_EMAIL = os.getenv("ADMIN_CONTACT_EMAIL", EMAIL_HOST_USER or "admin@kaloriz.store")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # Midtrans configuration
@@ -289,3 +291,37 @@ JAZZMIN_UI_TWEAKS = {
 SHIPPING_ENABLED = True
 DEFAULT_SHIPPING_CITY = "Makassar"
 DEFAULT_SHIPPING_PROVINCE = "Sulawesi Selatan"
+
+
+# ============================================
+# LOGGING
+# ============================================
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.core.mail": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "core": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    },
+}

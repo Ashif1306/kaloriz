@@ -7,13 +7,334 @@
 
 {% block extra_head %}
 <style>
+  :root {
+    --brand-start: #38b6ff;
+    --brand-end: #1f78ff;
+    --text-dark: #0f172a;
+    --text-muted: #6b7280;
+    --card-radius: 28px;
+  }
+
   body {
     margin: 0;
     padding: 0;
+    background: linear-gradient(135deg, #e7f3ff 0%, #f5f8ff 50%, #e7f3ff 100%);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
   footer {
     display: none;
+  }
+
+  .register-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+
+  .register-card {
+    width: 100%;
+    max-width: 1180px;
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: 0 25px 70px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+    display: flex;
+    min-height: 680px;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+  }
+
+  .slide-out-left {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+
+  .slide-out-right {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+
+  .register-left {
+    flex: 1;
+    padding: 56px 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+  }
+
+  .form-wrapper {
+    width: 100%;
+    max-width: 460px;
+  }
+
+  .form-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 14px;
+    text-align: center;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .form-subtitle {
+    color: var(--text-muted);
+    margin: 0 0 26px;
+    line-height: 1.6;
+  }
+
+  .auth-form {
+    width: 100%;
+  }
+
+  .auth-message {
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
+
+  .auth-field {
+    margin-bottom: 5px;
+  }
+
+  .auth-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 2px;
+  }
+
+  .auth-form input[type="text"],
+  .auth-form input[type="email"],
+  .auth-form input[type="password"] {
+    width: 100%;
+    padding: 14px 18px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f8fafc;
+    font-size: 15px;
+    transition: all 0.3s ease;
+  }
+
+  .auth-form input:focus {
+    outline: none;
+    border-color: var(--brand-start);
+    box-shadow: 0 0 0 6px rgba(56, 182, 255, 0.15);
+    background: #ffffff;
+  }
+
+  .auth-password-wrapper {
+    position: relative;
+  }
+
+  .auth-password-toggle {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #9ca3af;
+    font-size: 18px;
+  }
+
+  .verification-help {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .auth-submit {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--brand-start), var(--brand-end));
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 18px 30px rgba(31, 120, 255, 0.28);
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+    margin-top: 10px;
+  }
+
+  .auth-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 20px 38px rgba(31, 120, 255, 0.35);
+  }
+
+  .auth-submit:active {
+    transform: translateY(0);
+  }
+
+  .auth-meta {
+    margin-top: 16px;
+    color: var(--text-muted);
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .auth-meta a {
+    color: var(--brand-start);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .auth-meta a:hover {
+    text-decoration: underline;
+  }
+
+  .register-right {
+    flex: 1;
+    background: linear-gradient(135deg, var(--brand-start) 0%, var(--brand-end) 100%);
+    color: #ffffff;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 48px 44px;
+    gap: 28px;
+  }
+
+  .register-right::after {
+    content: '';
+    position: absolute;
+    inset: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 22px;
+    pointer-events: none;
+  }
+
+  .right-copy {
+    position: relative;
+    z-index: 2;
+    max-width: 440px;
+  }
+
+  .right-copy h2 {
+    margin: 0 0 14px;
+    font-size: 34px;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+
+  .right-copy p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .slider-shell {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+
+  .visual-slider {
+    width: 100%;
+    max-width: 520px;
+    height: 320px;
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .visual-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    transform: translateX(20px);
+    background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.14), transparent 45%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08), transparent 40%);
+  }
+
+  .visual-slide img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .visual-slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    z-index: 1;
+  }
+
+  .slide-dots {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .slide-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+  }
+
+  .slide-dot.active {
+    width: 24px;
+    border-radius: 999px;
+    background: #ffffff;
+  }
+
+  @media (max-width: 1024px) {
+    .register-card {
+      flex-direction: column;
+      min-height: auto;
+    }
+
+    .register-right {
+      min-height: 360px;
+    }
+
+    .register-left {
+      padding: 42px 36px 52px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .register-card {
+      border-radius: 18px;
+    }
+
+    .register-right {
+      padding: 32px 26px;
+    }
+
+    .right-copy h2 {
+      font-size: 28px;
+    }
+
+    .visual-slider {
+      height: 260px;
+    }
+
+    .register-left {
+      padding: 32px 24px 40px;
+    }
   }
 </style>
 {% endblock %}
@@ -21,77 +342,145 @@
 {% block navbar %}{% endblock %}
 
 {% block content %}
-<div class="auth-page auth-page--register">
-  <div class="auth-card">
-    <div class="auth-content">
-      <div class="auth-header">
-        <span class="auth-badge"><i class="fas fa-user-plus"></i> Buat akun</span>
-        <h2>Bergabung dan Nikmati Pengalaman Belanja Premium</h2>
-        <p>Dapatkan akses ke kurasi produk terbaru, wishlist pribadi, hingga promo eksklusif yang dikirimkan langsung ke inbox Anda.</p>
-      </div>
+<div class="register-wrapper">
+  <div class="register-card auth-container">
+    <div class="register-left">
+      <div class="form-wrapper">
+        <h1 class="form-title">Registrasi</h1>
 
-      <form method="post" class="auth-form">
-        {% csrf_token %}
+        <form method="post" class="auth-form">
+          {% csrf_token %}
 
-        {% if form.non_field_errors %}
-          <div class="auth-message auth-message--error">
-            {{ form.non_field_errors|join:' ' }}
+          {% if form.non_field_errors %}
+            <div class="auth-message">
+              {{ form.non_field_errors|join:' ' }}
+            </div>
+          {% endif %}
+
+          <div class="auth-field">
+            <label for="{{ form.first_name.id_for_label }}" class="auth-label">{{ form.first_name.label }}</label>
+            {{ form.first_name }}
+            {% if form.first_name.errors %}
+              <small class="text-danger d-block mt-2">{{ form.first_name.errors.0 }}</small>
+            {% endif %}
           </div>
-        {% endif %}
 
-        <div class="auth-field">
-          <label for="{{ form.first_name.id_for_label }}" class="auth-label">{{ form.first_name.label }}</label>
-          {{ form.first_name }}
-          {% if form.first_name.errors %}
-            <small class="text-danger d-block mt-2">{{ form.first_name.errors.0 }}</small>
-          {% endif %}
-        </div>
+          <div class="auth-field">
+            <label for="{{ form.email.id_for_label }}" class="auth-label">{{ form.email.label }}</label>
+            {{ form.email }}
+            {% if form.email.errors %}
+              <small class="text-danger d-block mt-2">{{ form.email.errors.0 }}</small>
+            {% endif %}
+          </div>
 
-        <div class="auth-field">
-          <label for="{{ form.email.id_for_label }}" class="auth-label">{{ form.email.label }}</label>
-          {{ form.email }}
-          {% if form.email.errors %}
-            <small class="text-danger d-block mt-2">{{ form.email.errors.0 }}</small>
-          {% endif %}
-        </div>
+          <div class="auth-field">
+            <label for="{{ form.password1.id_for_label }}" class="auth-label">{{ form.password1.label }}</label>
+            <div class="auth-password-wrapper">
+              {{ form.password1 }}
+              <span class="auth-password-toggle" onclick="togglePassword('{{ form.password1.id_for_label }}', 'toggleIconPassword1')">
+                <i class="far fa-eye" id="toggleIconPassword1"></i>
+              </span>
+            </div>
+            <small class="verification-help d-block mt-1">Gunakan kombinasi huruf, angka, dan simbol untuk keamanan maksimal.</small>
+            {% if form.password1.errors %}
+              <small class="text-danger d-block mt-2">{{ form.password1.errors.0 }}</small>
+            {% endif %}
+          </div>
 
-        <div class="auth-field">
-          <label for="{{ form.password1.id_for_label }}" class="auth-label">{{ form.password1.label }}</label>
-          {{ form.password1 }}
-          <small class="verification-help d-block mt-1">Gunakan kombinasi huruf, angka, dan simbol untuk keamanan maksimal.</small>
-          {% if form.password1.errors %}
-            <small class="text-danger d-block mt-2">{{ form.password1.errors.0 }}</small>
-          {% endif %}
-        </div>
+          <div class="auth-field">
+            <label for="{{ form.password2.id_for_label }}" class="auth-label">{{ form.password2.label }}</label>
+            <div class="auth-password-wrapper">
+              {{ form.password2 }}
+              <span class="auth-password-toggle" onclick="togglePassword('{{ form.password2.id_for_label }}', 'toggleIconPassword2')">
+                <i class="far fa-eye" id="toggleIconPassword2"></i>
+              </span>
+            </div>
+            {% if form.password2.errors %}
+              <small class="text-danger d-block mt-2">{{ form.password2.errors.0 }}</small>
+            {% endif %}
+          </div>
 
-        <div class="auth-field">
-          <label for="{{ form.password2.id_for_label }}" class="auth-label">{{ form.password2.label }}</label>
-          {{ form.password2 }}
-          {% if form.password2.errors %}
-            <small class="text-danger d-block mt-2">{{ form.password2.errors.0 }}</small>
-          {% endif %}
-        </div>
+          <button type="submit" class="auth-submit">Daftar Sekarang</button>
+        </form>
 
-        <button type="submit" class="auth-submit">Daftar Sekarang</button>
-      </form>
-
-      <p class="auth-meta">Sudah punya akun? <a href="{% url 'core:login' %}">Masuk di sini</a></p>
+        <p class="auth-meta">Sudah punya akun? <a href="{% url 'core:login' %}">Masuk di sini</a></p>
+      </div>
     </div>
 
-    <div class="auth-visual">
-      <div class="auth-illustration">
-        <img src="{% static 'images/auth-illustration.svg' %}" alt="Kaloriz onboarding" loading="lazy">
+    <div class="register-right">
+      <div class="right-copy">
+        <h2>Optimalkan perjalanan sehatmu</h2>
+        <p>Daftar untuk menyimpan preferensi, menantikan rekomendasi personal, dan menikmati promo eksklusif.</p>
       </div>
-      <div class="auth-visual-content">
-        <span class="auth-pill">Proses registrasi yang mulus</span>
-        <h3>Mulai personalisasi rekomendasi hanya dalam hitungan menit</h3>
-        <p class="auth-description">Verifikasi email instan, kelola alamat pengiriman, dan simpan preferensi Anda sejak awal.</p>
-        <div class="auth-message auth-message--accent">
-          <i class="fas fa-envelope-open-text"></i>
-          Email verifikasi akan dikirim otomatis. Pastikan alamat email aktif agar tidak melewatkan notifikasi penting.
+
+      <div class="slider-shell">
+        <div class="visual-slider" id="visualSlider">
+          <div class="visual-slide active">
+            <img src="{% static 'images/login-illustration.svg' %}" alt="Ilustrasi login Kaloriz">
+          </div>
+          <div class="visual-slide">
+            <img src="{% static 'images/auth-illustration.svg' %}" alt="Ilustrasi sehat Kaloriz">
+          </div>
         </div>
+      </div>
+
+      <div class="slide-dots" id="slideDots">
+        <span class="slide-dot active"></span>
+        <span class="slide-dot"></span>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+  function togglePassword(inputId, iconId) {
+    const passwordInput = document.getElementById(inputId);
+    const toggleIcon = document.getElementById(iconId);
+
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggleIcon.classList.remove('fa-eye');
+      toggleIcon.classList.add('fa-eye-slash');
+    } else {
+      passwordInput.type = 'password';
+      toggleIcon.classList.remove('fa-eye-slash');
+      toggleIcon.classList.add('fa-eye');
+    }
+  }
+
+  (function() {
+    const slides = document.querySelectorAll('.visual-slide');
+    const dots = document.querySelectorAll('.slide-dot');
+    let currentIndex = 0;
+
+    function showSlide(index) {
+      slides.forEach((slide, i) => {
+        slide.classList.toggle('active', i === index);
+      });
+      dots.forEach((dot, i) => {
+        dot.classList.toggle('active', i === index);
+      });
+    }
+
+    setInterval(() => {
+      currentIndex = (currentIndex + 1) % slides.length;
+      showSlide(currentIndex);
+    }, 4000);
+  })();
+
+  (function() {
+    const authContainer = document.querySelector('.auth-container');
+    const loginLink = document.querySelector('.auth-meta a[href$="{% url 'core:login' %}"]');
+
+    if (authContainer && loginLink) {
+      loginLink.addEventListener('click', function(event) {
+        event.preventDefault();
+        authContainer.classList.add('slide-out-right');
+        setTimeout(() => {
+          window.location.href = this.href;
+        }, 400);
+      });
+    }
+  })();
+</script>
 {% endblock %}

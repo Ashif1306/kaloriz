@@ -8,6 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.views import PasswordResetView
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import F, Count
@@ -39,6 +40,51 @@ from django.views.decorators.http import require_POST
 
 
 logger = logging.getLogger(__name__)
+
+
+class LoggingPasswordResetView(PasswordResetView):
+    """Password reset view that logs success and errors with production-friendly URLs."""
+
+    def form_valid(self, form):
+        try:
+            response = super().form_valid(form)
+            logger.info("Password reset email sent", extra={"email": form.cleaned_data.get("email")})
+            return response
+        except Exception:
+            logger.exception(
+                "Failed to send password reset email",
+                extra={"email": form.cleaned_data.get("email")},
+            )
+            messages.error(
+                self.request,
+                "Gagal mengirim email reset password. Silakan coba lagi atau hubungi admin.",
+            )
+            return self.form_invalid(form)
+
+    def get_email_context(self, context):
+        email_context = super().get_email_context(context)
+        domain = getattr(settings, "SITE_DOMAIN", None)
+        scheme = getattr(settings, "SITE_SCHEME", "https")
+
+        if domain:
+            email_context.update(
+                {
+                    "domain": domain,
+                    "protocol": scheme,
+                    "site_name": settings.SITE_NAME,
+                }
+            )
+        else:
+            request = getattr(self, "request", None)
+            if request:
+                email_context.update(
+                    {
+                        "domain": request.get_host(),
+                        "protocol": "https" if request.is_secure() else "http",
+                    }
+                )
+
+        return email_context
 
 
 def _get_active_cart(request):
