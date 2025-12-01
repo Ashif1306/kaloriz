@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Category, Product, Testimonial, DiscountCode
+from .models import Category, Product, Testimonial, DiscountCode, ContactMessage
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -138,3 +138,11 @@ class DiscountCodeAdmin(admin.ModelAdmin):
     @admin.display(description='Detail Diskon')
     def discount_overview(self, obj):
         return obj.get_type_label()
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ['name', 'email', 'phone', 'subject', 'created_at']
+    search_fields = ['name', 'email', 'phone', 'subject', 'message']
+    list_filter = ['created_at']
+    readonly_fields = ['name', 'email', 'phone', 'subject', 'message', 'created_at']

@@ -1,10 +1,13 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+import logging
+
 from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.mail import send_mail
 from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
@@ -14,7 +17,10 @@ from django.views.decorators.http import require_POST
 from core.models import Cart, Order
 from shipping.models import District
 
-from .models import Product, Category, Testimonial, DiscountCode
+from .models import Product, Category, Testimonial, DiscountCode, ContactMessage
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_watchlisted_product_ids(request):
@@ -207,19 +213,53 @@ def about(request):
 
 def contact(request):
     """Contact us page"""
-    from django.http import JsonResponse
+    admin_email = getattr(settings, 'ADMIN_CONTACT_EMAIL', 'kaloriz64@gmail.com')
 
     if request.method == 'POST':
-        # Handle contact form submission
-        name = request.POST.get('name')
-        email = request.POST.get('email')
-        phone = request.POST.get('phone')
-        subject = request.POST.get('subject')
-        message = request.POST.get('message')
+        name = (request.POST.get('name') or '').strip()
+        email = (request.POST.get('email') or '').strip()
+        phone = (request.POST.get('phone') or '').strip()
+        subject = (request.POST.get('subject') or '').strip()
+        message_body = (request.POST.get('message') or '').strip()
 
-        # Here you can add logic to save to database or send email
-        # For now, just return success
-        messages.success(request, f'Terima kasih {name}! Pesan Anda telah diterima.')
+        contact_message = ContactMessage.objects.create(
+            name=name,
+            email=email,
+            phone=phone,
+            subject=subject,
+            message=message_body,
+        )
+
+        email_subject = f"Pesan Kontak Baru: {contact_message.subject or 'Tanpa Subjek'}"
+        email_message = (
+            "Pesan baru dikirim melalui formulir kontak Kaloriz:\n\n"
+            f"Nama    : {contact_message.name}\n"
+            f"Email   : {contact_message.email}\n"
+            f"Telepon : {contact_message.phone}\n"
+            f"Subjek  : {contact_message.subject}\n\n"
+            f"Pesan:\n{contact_message.message}"
+        )
+
+        email_sent = False
+        try:
+            send_mail(
+                email_subject,
+                email_message,
+                settings.DEFAULT_FROM_EMAIL or admin_email,
+                [admin_email],
+                fail_silently=False,
+            )
+            email_sent = True
+        except Exception:
+            logger.exception("Gagal mengirim email kontak")
+
+        if email_sent:
+            messages.success(request, f'Terima kasih {contact_message.name}! Pesan Anda telah kami terima dan akan segera diproses.')
+        else:
+            messages.warning(
+                request,
+                'Pesan Anda tersimpan, namun terjadi kendala saat mengirim email ke admin. Kami akan memeriksanya segera.',
+            )
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': True})

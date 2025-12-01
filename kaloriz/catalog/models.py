@@ -425,6 +425,23 @@ class DiscountCode(models.Model):
         return f"{percent_display} cap {cap_display}"
 
 
+class ContactMessage(models.Model):
+    name = models.CharField(max_length=150, verbose_name="Nama")
+    email = models.EmailField(verbose_name="Email")
+    phone = models.CharField(max_length=50, verbose_name="Nomor Telepon")
+    subject = models.CharField(max_length=150, verbose_name="Subjek")
+    message = models.TextField(verbose_name="Pesan")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Dikirim Pada")
+
+    class Meta:
+        verbose_name = "Pesan Kontak"
+        verbose_name_plural = "Pesan Kontak"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.subject}"
+
+
 def _format_currency(value) -> str:
     try:
         amount = Decimal(value or 0)

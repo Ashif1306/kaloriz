@@ -29,7 +29,17 @@
               Punya pertanyaan atau saran? Isi form di bawah ini dan kami akan segera merespon
             </p>
 
-            <form method="post" id="contactForm">
+            {% if messages %}
+            <div class="mb-4">
+              {% for message in messages %}
+              <div class="alert alert-{{ message.tags|default:'info' }} mb-3" role="alert">
+                {{ message }}
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'catalog:contact' %}" id="contactForm">
               {% csrf_token %}
 
               <div class="form-row">
@@ -93,9 +103,9 @@
                 <div>
                   <h6 class="font-weight-bold">Alamat</h6>
                   <p class="text-muted mb-0">
-                    Jl. Raya E-Commerce No. 123<br>
-                    Jakarta Selatan, DKI Jakarta 12345<br>
-                    Indonesia
+                    Jl. Pendidikan I No.27<br>
+                    Tidung, Kec. Rappocini, Kota Makassar<br>
+                    Sulawesi Selatan 90222
                   </p>
                 </div>
               </div>
@@ -109,8 +119,8 @@
                 <div>
                   <h6 class="font-weight-bold">Telepon</h6>
                   <p class="text-muted mb-0">
-                    +62 21 1234 5678<br>
-                    +62 812 3456 7890 (WA)
+                    +62 822 4671 5501 (WA)<br>
+                    +62 819 3391 2017 (WA)
                   </p>
                 </div>
               </div>
@@ -163,7 +173,7 @@
               <a href="#" class="btn btn-outline-danger btn-lg mr-2 mb-2">
                 <i class="fab fa-instagram"></i>
               </a>
-              <a href="#" class="btn btn-outline-success btn-lg mr-2 mb-2">
+              <a href="https://wa.me/6282246715501?text=halo%20admin%20kaloriz" class="btn btn-outline-success btn-lg mr-2 mb-2">
                 <i class="fab fa-whatsapp"></i>
               </a>
               <a href="#" class="btn btn-outline-primary btn-lg mr-2 mb-2">
@@ -184,7 +194,7 @@
 <section class="map-section">
   <div class="container-fluid px-0">
     <iframe
-      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3966.2677866772363!2d106.82493631476899!3d-6.229728095502103!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f3e945e34b9d%3A0x5371bf0fdad786a2!2sJakarta!5e0!3m2!1sen!2sid!4v1234567890123!5m2!1sen!2sid"
+      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3776.981251258202!2d119.43550307474213!3d-5.16926319480813!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dbee28d862c0963%3A0x51ad138723b6bd7!2sFakultas%20Ekonomi%20-%20UNM!5e1!3m2!1sen!2sid!4v1764491066440!5m2!1sen!2sid"
       width="100%"
       height="450"
       style="border:0;"
@@ -306,35 +316,4 @@
   }
 </style>
 
-<script>
-  document.getElementById('contactForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    // Get form data
-    const formData = new FormData(this);
-
-    // Send form via AJAX (or you can use regular form submission)
-    fetch("{% url 'catalog:contact' %}", {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'X-CSRFToken': getCookie('csrftoken')
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        alert('Pesan Anda berhasil dikirim! Kami akan segera menghubungi Anda.');
-        this.reset();
-      } else {
-        alert('Terjadi kesalahan. Silakan coba lagi.');
-      }
-    })
-    .catch(error => {
-      // For now, just show success message (since backend not fully implemented)
-      alert('Pesan Anda berhasil dikirim! Kami akan segera menghubungi Anda.');
-      this.reset();
-    });
-  });
-</script>
 {% endblock %}
