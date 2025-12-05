@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import F, Count
 from django.utils import timezone
+from django.core.paginator import Paginator
 from django.utils.formats import number_format
 from django.urls import reverse
 
@@ -878,17 +879,21 @@ def order_list(request):
     """List user's orders"""
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     orders_qs = Order.objects.filter(user=request.user).order_by('-created_at')
-    orders = list(orders_qs)
-    expired_orders = [order for order in orders if order.status == 'pending' and order.is_payment_overdue()]
+    expired_orders = [order for order in orders_qs if order.status == 'pending' and order.is_payment_overdue()]
 
     if expired_orders:
         for order in expired_orders:
             cancel_order_due_to_timeout(order)
-        orders = list(Order.objects.filter(user=request.user).order_by('-created_at'))
+        orders_qs = Order.objects.filter(user=request.user).order_by('-created_at')
+
+    paginator = Paginator(orders_qs, 5)
+    page_number = request.GET.get('page')
+    orders = paginator.get_page(page_number)
 
     context = {
         'profile': profile,
         'orders': orders,
+        'page_obj': orders,
         'active_tab': 'orders',
     }
     return render(request, 'core/order_list.html', context)

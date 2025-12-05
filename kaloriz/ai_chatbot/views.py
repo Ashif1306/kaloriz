@@ -282,11 +282,15 @@ def chatbot_view(request):
             return JsonResponse(
                 {
                     "reply": (
-                        "Berikut cara pemesanan di Kaloriz:\n"
-                        "1) Pilih produk dan klik Tambah ke Keranjang,\n"
-                        "2) Buka keranjang dan cek ulang pesanan,\n"
-                        "3) Klik Checkout, isi alamat, pilih metode pembayaran,\n"
-                        "4) Selesaikan pembayaran, dan pesanan akan kami proses. 🙂"
+                        "\n".join(
+                            [
+                                "Berikut cara pemesanan di Kaloriz:",
+                                "1) Pilih produk dan klik Tambah ke Keranjang.",
+                                "2) Buka keranjang dan cek ulang pesanan.",
+                                "3) Klik Checkout, isi alamat, pilih metode pembayaran.",
+                                "4) Selesaikan pembayaran, dan pesanan akan kami proses. 🙂",
+                            ]
+                        )
                     )
                 }
             )
@@ -495,8 +499,9 @@ def chatbot_view(request):
                     f"{idx}. {nomor_pesanan} – {tanggal_str} – {status_display}"
                 )
 
+            lines.append("")
             lines.append(
-                "Ketik 1/2/3 untuk memilih salah satu atau masukkan nomor pesanan kamu ya."
+                "Silakan ketik angka 1 / 2 / 3 atau masukkan nomor pesanan kamu ya."
             )
 
             return JsonResponse({"reply": "\n".join(lines)})

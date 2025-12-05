@@ -1204,7 +1204,9 @@
     function addMessage(text, sender = 'bot') {
       const bubble = document.createElement('div');
       bubble.className = `kaloriz-chat-bubble kaloriz-chat-${sender}`;
-      bubble.textContent = text;
+      const content = text || '';
+      bubble.textContent = content;
+      bubble.innerHTML = bubble.innerHTML.replace(/\n/g, '<br>');
       messages.appendChild(bubble);
       scrollToBottom();
     }

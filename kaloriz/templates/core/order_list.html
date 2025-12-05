@@ -1,4 +1,47 @@
 {% extends 'core/profile_layout.html' %}
+{% block profile_extra_head %}
+  {{ block.super }}
+  <style>
+    .order-pagination {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .order-pagination__list {
+      list-style: none;
+      display: flex;
+      gap: 8px;
+      padding: 0;
+      margin: 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .order-pagination__link,
+    .order-pagination__link:visited,
+    .order-pagination__link:focus {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      color: #0d6efd;
+      text-decoration: none;
+      background: #ffffff;
+    }
+
+    .order-pagination__link:hover {
+      background: #f5f8ff;
+    }
+
+    .order-pagination__link--active {
+      background: #0d6efd;
+      color: #ffffff;
+      border-color: #0d6efd;
+      cursor: default;
+    }
+  </style>
+{% endblock %}
 
 {% block title %}Pesanan Saya - Kaloriz{% endblock %}
 
@@ -77,6 +120,30 @@
       </article>
       {% endfor %}
     </div>
+
+    {% if orders.has_other_pages %}
+      <nav class="order-pagination" aria-label="Paginasi pesanan">
+        <ul class="order-pagination__list">
+          {% if orders.has_previous %}
+            <li><a class="order-pagination__link" href="?page={{ orders.previous_page_number }}">‹ Sebelumnya</a></li>
+          {% endif %}
+
+          {% for page_number in orders.paginator.page_range %}
+            <li>
+              {% if page_number == orders.number %}
+                <span class="order-pagination__link order-pagination__link--active">{{ page_number }}</span>
+              {% else %}
+                <a class="order-pagination__link" href="?page={{ page_number }}">{{ page_number }}</a>
+              {% endif %}
+            </li>
+          {% endfor %}
+
+          {% if orders.has_next %}
+            <li><a class="order-pagination__link" href="?page={{ orders.next_page_number }}">Berikutnya ›</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
   {% else %}
     <div class="profile-empty">
       <i class="fas fa-receipt"></i>
