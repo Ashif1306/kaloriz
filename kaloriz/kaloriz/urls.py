@@ -19,6 +19,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("catalog.urls")),
     path("", include("core.urls")),
+    path("chatbot/", include("ai_chatbot.urls")),
     path("shipping/", include("shipping.urls")),  # Shipping module
     path("payment/", include("payment.urls")),
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),

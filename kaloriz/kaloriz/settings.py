@@ -43,6 +43,22 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 
+# OpenRouter credentials dan prioritas model
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+NOVA_MODEL_ID = os.getenv("NOVA_MODEL_ID", "")
+TRINITY_MODEL_ID = os.getenv("TRINITY_MODEL_ID", "")
+DEEPSEEK_MODEL_ID = os.getenv("DEEPSEEK_MODEL_ID", "")
+NEMOTRON_MODEL_ID = os.getenv("NEMOTRON_MODEL_ID", "")
+
+CHATBOT_MODELS_PRIORITY = [
+    NOVA_MODEL_ID,
+    TRINITY_MODEL_ID,
+    DEEPSEEK_MODEL_ID,
+    NEMOTRON_MODEL_ID,
+]
+
+
 
 # Application definition
 
@@ -61,6 +77,7 @@ INSTALLED_APPS = [
     "catalog",
     "shipping",
     "payment",
+    "ai_chatbot",
 ]
 
 
