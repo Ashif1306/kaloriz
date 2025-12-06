@@ -278,6 +278,133 @@ def chatbot_view(request):
             "Jangan pernah mengarang daftar pesanan / riwayat order. Jika user bertanya daftar pesanan tapi intent di backend gagal, jawab singkat: 'Silakan buka menu Pesanan Saya di website Kaloriz untuk melihat riwayat lengkap.'"
             "\nJika user bertanya jam operasional atau jam buka, backend sudah meng-handle, jadi jangan jawab lagi."
         )
+
+        def handle_general_intents(allow_order_prompt: bool = False):
+            product_phrases = (
+                "daftar produk yang tersedia",
+                "produk apa saja",
+                "lihat produk",
+                "produk tersedia",
+            )
+            intent = classify_intent(message)
+
+            is_product_intent = intent == "PRODUCT_INFO" or any(
+                phrase in normalized_message for phrase in product_phrases
+            )
+
+            if is_product_intent:
+                products = Product.objects.filter(is_active=True).order_by("name")[:5]
+
+                if not products:
+                    return (
+                        "Saat ini belum ada produk yang tersedia. "
+                        "Silakan cek kembali nanti ya 😊"
+                    )
+
+                lines = ["Berikut beberapa produk Kaloriz yang tersedia:"]
+                for product in products:
+                    price_str = format_currency(product.price)
+                    lines.append(f"• {product.name} – {price_str}")
+                lines.append("Silakan cek halaman katalog untuk detail lengkap 😊")
+
+                return "\n".join(lines)
+
+            if intent == "DATETIME":
+                tanggal_info = format_datetime_id()
+                return (
+                    f"Hari ini adalah {tanggal_info['tanggal_lengkap']}\n"
+                    f"Sekarang tanggal {tanggal_info['tanggal']} dan hari {tanggal_info['hari']}"
+                )
+
+            if intent == "TRACK_ORDER":
+                if allow_order_prompt:
+                    return (
+                        "Silakan ketik 'lacak pesanan' atau masukkan nomor pesanan "
+                        "untuk melihat status pesanan kamu."
+                    )
+
+                return "Silakan login terlebih dahulu untuk melihat pesanan Anda ya 😊"
+
+            if intent == "DISTRICT_LIST":
+                districts = District.objects.filter(is_active=True).order_by("name")
+
+                if not districts.exists():
+                    return (
+                        "Saat ini belum ada kecamatan yang terdaftar untuk pengiriman Kaloriz. "
+                        "Silakan cek kembali nanti ya 😊"
+                    )
+
+                lines = [
+                    "Berikut daftar kecamatan yang saat ini sudah terdaftar di Kaloriz:\n"
+                ]
+
+                for district in districts:
+                    lines.append(
+                        (
+                            f"• {district.name} → Tarif Reguler {format_currency(district.reg_cost)}, "
+                            f"Express {format_currency(district.exp_cost)} "
+                            f"(ETA Reguler {district.eta_reg}, ETA Express {district.eta_exp})"
+                        )
+                    )
+
+                lines.append(
+                    "\nJika kecamatanmu belum ada, silakan hubungi admin Kaloriz ya 😊"
+                )
+
+                return "\n".join(lines)
+
+            if intent == "ONGKIR_INFO":
+                district, best_score = get_district_from_text(message)
+
+                if district:
+                    return (
+                        f"Ongkir ke Kecamatan {district.name}:\n"
+                        f"• Tarif Reguler: {format_currency(district.reg_cost)} (ETA {district.eta_reg})\n"
+                        f"• Tarif Express: {format_currency(district.exp_cost)} (ETA {district.eta_exp})"
+                    )
+
+                active_districts = District.objects.filter(is_active=True).order_by("name")
+
+                if best_score >= 0.4:
+                    return (
+                        "Maaf, saya belum menemukan data ongkir untuk kecamatan itu. "
+                        "Silakan cek penulisan atau pilih kecamatan yang tersedia."
+                    )
+
+                if not active_districts.exists():
+                    return "Maaf, belum ada data ongkir yang tersedia."
+
+                lines = ["Berikut daftar ongkir Kaloriz:"]
+                for dist in active_districts:
+                    lines.append(
+                        f"- {dist.name}: {format_currency(dist.reg_cost)} (Reg) / "
+                        f"{format_currency(dist.exp_cost)} (Express)"
+                    )
+                return "\n".join(lines)
+
+            if intent == "CANCEL_ORDER_INFO":
+                return (
+                    "Pesanan yang sudah dibayar bisa dibatalkan jika statusnya belum dikemas. "
+                    "Silakan hubungi admin Kaloriz atau gunakan fitur pembatalan di halaman pesanan jika tersedia."
+                )
+
+            if intent in {
+                "PAYMENT_INFO",
+                "SHIPPING_INFO",
+                "OPERATIONAL_HOURS",
+                "CONTACT_ADMIN",
+            }:
+                context_hint = (
+                    "Jawab secara singkat dalam Bahasa Indonesia. "
+                    "Jika ada informasi harga atau kebijakan, sampaikan secara umum tanpa detail sensitif."
+                )
+                return ask_ai_with_priority(
+                    f"{context_hint}\n\n{ai_product_safety}\n\nPertanyaan: {message}"
+                )
+
+            return ask_ai_with_priority(
+                f"{ai_product_safety}\n\nPertanyaan: {message}"
+            )
         if any(phrase in normalized_message for phrase in ("cara pesan", "cara pemesanan", "cara order")):
             # Intent "cara pesan": balas manual tanpa memanggil AI
             return JsonResponse(
@@ -317,6 +444,10 @@ def chatbot_view(request):
         if tanggal_reply:
             return JsonResponse({"reply": tanggal_reply})
 
+        if not user_authenticated:
+            response = handle_general_intents()
+            return JsonResponse({"reply": response})
+
         # Intent: daftar pesanan (tanpa AI, pakai data Order user)
         order_history_phrases = (
             "daftar pesanan",
@@ -325,46 +456,41 @@ def chatbot_view(request):
             "riwayat pesanan",
         )
         if any(phrase in normalized_message for phrase in order_history_phrases):
-            if not user_authenticated:
-                return JsonResponse(
-                    {
-                        "reply": (
-                            "Untuk melihat daftar pesanan, silakan login terlebih dahulu ya 🙂"
-                        )
-                    }
+            try:
+                orders = (
+                    Order.objects.filter(user=request.user).order_by("-created_at")[:5]
                 )
 
-            orders = (
-                Order.objects.filter(user=request.user)
-                .order_by("-created_at")[:5]
-            )
+                if not orders:
+                    return JsonResponse(
+                        {
+                            "reply": (
+                                "Kamu belum memiliki pesanan di Kaloriz. "
+                                "Yuk coba checkout produk pertama kamu! 😊"
+                            )
+                        }
+                    )
 
-            if not orders:
-                return JsonResponse(
-                    {
-                        "reply": (
-                            "Kamu belum memiliki pesanan di Kaloriz. "
-                            "Yuk coba checkout produk pertama kamu! 😊"
-                        )
-                    }
-                )
+                lines = ["Berikut 5 pesanan terakhir kamu:"]
+                for idx, order in enumerate(orders, start=1):
+                    created_at = order.created_at
+                    month_name = MONTH_NAMES.get(created_at.month, "")[:3]
+                    tanggal_str = f"{created_at.day:02d} {month_name} {created_at.year}"
+                    nomor_pesanan = get_order_identifier(order)
+                    status_display = get_order_status_label(order)
+                    lines.append(
+                        f"{idx}. {nomor_pesanan} – {tanggal_str} – {status_display}"
+                    )
 
-            lines = ["Berikut 5 pesanan terakhir kamu:"]
-            for idx, order in enumerate(orders, start=1):
-                created_at = order.created_at
-                month_name = MONTH_NAMES.get(created_at.month, "")[:3]
-                tanggal_str = f"{created_at.day:02d} {month_name} {created_at.year}"
-                nomor_pesanan = get_order_identifier(order)
-                status_display = get_order_status_label(order)
                 lines.append(
-                    f"{idx}. {nomor_pesanan} – {tanggal_str} – {status_display}"
+                    "Kamu bisa melihat detail lengkap di halaman 'Pesanan Saya' di website Kaloriz."
                 )
 
-            lines.append(
-                "Kamu bisa melihat detail lengkap di halaman 'Pesanan Saya' di website Kaloriz."
-            )
+                return JsonResponse({"reply": "\n".join(lines)})
 
-            return JsonResponse({"reply": "\n".join(lines)})
+            except Exception as e:
+                logger.error(f"Chatbot error: {e}")
+                return JsonResponse({"reply": "Maaf, sistem sedang bermasalah."})
 
         # Intent: Lacak Pesanan (prioritas sebelum memanggil AI)
         track_order_phrases = (
@@ -393,275 +519,118 @@ def chatbot_view(request):
             request.session.pop("chatbot_last_orders", None)
 
         if is_track_order_intent:
-            if not user_authenticated:
-                reset_order_session()
-                return JsonResponse(
-                    {
-                        "reply": (
-                            "Untuk melacak pesanan, silakan login terlebih dahulu ya 🙂"
-                        )
-                    }
-                )
-
-            orders_qs = Order.objects.filter(user=request.user).order_by("-created_at")
-            if not orders_qs.exists():
-                reset_order_session()
-                return JsonResponse(
-                    {
-                        "reply": (
-                            "Kamu belum memiliki pesanan di Kaloriz. "
-                            "Yuk coba checkout produk pertama kamu! 😊"
-                        )
-                    }
-                )
-
-            last_orders = list(orders_qs[:3])
-
-            def find_order_by_reference(reference: str):
-                cleaned_ref = (reference or "").strip()
-                if not cleaned_ref:
-                    return None
-
-                candidate = orders_qs.filter(
-                    Q(order_number__iexact=cleaned_ref)
-                    | Q(midtrans_order_id__iexact=cleaned_ref)
-                ).first()
-
-                if candidate:
-                    return candidate
-
-                if cleaned_ref.isdigit():
-                    try:
-                        return orders_qs.filter(pk=int(cleaned_ref)).first()
-                    except (TypeError, ValueError):
-                        return None
-
-                return None
-
-            if awaiting_order_selection and not any(
-                phrase in normalized_message for phrase in track_order_phrases
-            ):
-                selection = message.strip()
-                selected_order = None
-
-                if selection.isdigit() and last_order_ids:
-                    index = int(selection) - 1
-                    if 0 <= index < len(last_order_ids):
-                        order_id = last_order_ids[index]
-                        selected_order = next(
-                            (o for o in last_orders if o.id == order_id), None
-                        ) or orders_qs.filter(id=order_id).first()
-
-                if selected_order is None:
-                    selected_order = find_order_by_reference(selection)
-
-                if selected_order is None:
+            try:
+                orders_qs = Order.objects.filter(user=request.user).order_by("-created_at")
+                if not orders_qs.exists():
+                    reset_order_session()
                     return JsonResponse(
                         {
                             "reply": (
-                                "Maaf, aku belum menemukan nomor pesanan tersebut. "
-                                "Ketik 1/2/3 atau masukkan nomor pesanan lengkap ya."
+                                "Kamu belum memiliki pesanan di Kaloriz. "
+                                "Yuk coba checkout produk pertama kamu! 😊"
                             )
                         }
                     )
 
-                reset_order_session()
-                return JsonResponse(
-                    {"reply": "\n".join(format_order_detail_lines(selected_order))}
-                )
+                last_orders = list(orders_qs[:3])
 
-            if looks_like_order_reference and not awaiting_order_selection:
-                direct_order = find_order_by_reference(message)
-                if direct_order:
+                def find_order_by_reference(reference: str):
+                    cleaned_ref = (reference or "").strip()
+                    if not cleaned_ref:
+                        return None
+
+                    candidate = orders_qs.filter(
+                        Q(order_number__iexact=cleaned_ref)
+                        | Q(midtrans_order_id__iexact=cleaned_ref)
+                    ).first()
+
+                    if candidate:
+                        return candidate
+
+                    if cleaned_ref.isdigit():
+                        try:
+                            return orders_qs.filter(pk=int(cleaned_ref)).first()
+                        except (TypeError, ValueError):
+                            return None
+
+                    return None
+
+                if awaiting_order_selection and not any(
+                    phrase in normalized_message for phrase in track_order_phrases
+                ):
+                    selection = message.strip()
+                    selected_order = None
+
+                    if selection.isdigit() and last_order_ids:
+                        index = int(selection) - 1
+                        if 0 <= index < len(last_order_ids):
+                            order_id = last_order_ids[index]
+                            selected_order = next(
+                                (o for o in last_orders if o.id == order_id), None
+                            ) or orders_qs.filter(id=order_id).first()
+
+                    if selected_order is None:
+                        selected_order = find_order_by_reference(selection)
+
+                    if selected_order is None:
+                        return JsonResponse(
+                            {
+                                "reply": (
+                                    "Maaf, aku belum menemukan nomor pesanan tersebut. "
+                                    "Ketik 1/2/3 atau masukkan nomor pesanan lengkap ya."
+                                )
+                            }
+                        )
+
                     reset_order_session()
                     return JsonResponse(
-                        {"reply": "\n".join(format_order_detail_lines(direct_order))}
+                        {"reply": "\n".join(format_order_detail_lines(selected_order))}
                     )
 
-                return JsonResponse(
-                    {
-                        "reply": (
-                            "Maaf, nomor pesanan tersebut belum ditemukan. "
-                            "Pastikan formatnya benar atau ketik 'lacak pesanan' untuk melihat daftar terbaru."
+                if looks_like_order_reference and not awaiting_order_selection:
+                    direct_order = find_order_by_reference(message)
+                    if direct_order:
+                        reset_order_session()
+                        return JsonResponse(
+                            {"reply": "\n".join(format_order_detail_lines(direct_order))}
                         )
-                    }
-                )
 
-            request.session["chatbot_state"] = "awaiting_order_selection"
-            request.session["chatbot_last_orders"] = [order.id for order in last_orders]
-
-            lines = ["Berikut 3 pesanan terakhir kamu:"]
-            for idx, order in enumerate(last_orders, start=1):
-                created_at = getattr(order, "created_at", None)
-                tanggal_str = created_at.strftime("%d %b %Y") if created_at else "-"
-                status_display = get_order_status_label(order)
-                nomor_pesanan = get_order_identifier(order)
-                lines.append(
-                    f"{idx}. {nomor_pesanan} – {tanggal_str} – {status_display}"
-                )
-
-            lines.append("")
-            lines.append(
-                "Silakan ketik angka 1 / 2 / 3 atau masukkan nomor pesanan kamu ya."
-            )
-
-            return JsonResponse({"reply": "\n".join(lines)})
-
-        intent = classify_intent(message)
-        reply_text = ""
-
-        product_phrases = (
-            "daftar produk yang tersedia",
-            "produk apa saja",
-            "lihat produk",
-            "produk tersedia",
-        )
-        is_product_intent = intent == "PRODUCT_INFO" or any(
-            phrase in normalized_message for phrase in product_phrases
-        )
-
-        if is_product_intent:
-            # Blok intent daftar produk: query langsung database tanpa AI
-            products = (
-                Product.objects.filter(is_active=True, stock__gt=0)
-                .order_by("name")[:10]
-            )
-
-            if not products.exists():
-                return JsonResponse(
-                    {
-                        "reply": (
-                            "Saat ini belum ada produk yang aktif di Kaloriz. "
-                            "Silakan cek kembali nanti ya 😊"
-                        )
-                    }
-                )
-
-            lines = ["Berikut beberapa produk yang saat ini tersedia di Kaloriz:"]
-            for product in products:
-                lines.append(
-                    f"- {product.name} – {format_currency(product.price)}"
-                )
-            lines.append(
-                "Silakan cek halaman katalog untuk detail lengkap 😊"
-            )
-
-            return JsonResponse({"reply": "\n".join(lines)})
-
-        if intent == "DATETIME":
-            tanggal_info = format_datetime_id()
-            reply_text = (
-                f"Hari ini adalah {tanggal_info['tanggal_lengkap']}\n"
-                f"Sekarang tanggal {tanggal_info['tanggal']} dan hari {tanggal_info['hari']}"
-            )
-
-        elif intent == "TRACK_ORDER":
-            if not user_authenticated:
-                reply_text = "Untuk melacak pesanan, silakan login terlebih dahulu ya 🙂"
-            else:
-                orders = (
-                    Order.objects.filter(user=request.user)
-                    .order_by("-created_at")[:3]
-                )
-                if not orders:
-                    reply_text = "Kamu belum punya pesanan di Kaloriz 😊"
-                else:
-                    lines = ["Berikut beberapa pesanan terakhirmu:"]
-                    for idx, order in enumerate(orders, start=1):
-                        nomor_pesanan = get_order_identifier(order)
-                        tanggal_str = (
-                            order.created_at.strftime("%d %b %Y")
-                            if getattr(order, "created_at", None)
-                            else "-"
-                        )
-                        status_display = get_order_status_label(order)
-                        lines.append(
-                            f"{idx}. {nomor_pesanan} – {tanggal_str} – {status_display}"
-                        )
-                    lines.append(
-                        "Ketik 'lacak pesanan' atau masukkan nomor pesanan untuk detail lebih lanjut."
-                    )
-                    reply_text = "\n".join(lines)
-
-        elif intent == "DISTRICT_LIST":
-            districts = District.objects.filter(is_active=True).order_by("name")
-
-            if not districts.exists():
-                reply_text = (
-                    "Saat ini belum ada kecamatan yang terdaftar untuk pengiriman Kaloriz. "
-                    "Silakan cek kembali nanti ya 😊"
-                )
-            else:
-                lines = ["Berikut daftar kecamatan yang saat ini sudah terdaftar di Kaloriz:\n"]
-
-                for district in districts:
-                    lines.append(
-                        (
-                            f"• {district.name} → Tarif Reguler {format_currency(district.reg_cost)}, "
-                            f"Express {format_currency(district.exp_cost)} "
-                            f"(ETA Reguler {district.eta_reg}, ETA Express {district.eta_exp})"
-                        )
-                    )
-
-                lines.append(
-                    "\nJika kecamatanmu belum ada, silakan hubungi admin Kaloriz ya 😊"
-                )
-
-                reply_text = "\n".join(lines)
-
-        elif intent == "ONGKIR_INFO":
-            district, best_score = get_district_from_text(message)
-
-            if district:
-                reply_text = (
-                    f"Ongkir ke Kecamatan {district.name}:\n"
-                    f"• Tarif Reguler: {format_currency(district.reg_cost)} (ETA {district.eta_reg})\n"
-                    f"• Tarif Express: {format_currency(district.exp_cost)} (ETA {district.eta_exp})"
-                )
-            else:
-                active_districts = District.objects.filter(is_active=True).order_by("name")
-
-                if best_score >= 0.4:
-                    reply_text = (
-                        "Maaf, saya belum menemukan data ongkir untuk kecamatan itu. "
-                        "Silakan cek penulisan atau pilih kecamatan yang tersedia."
-                    )
-                else:
-                    if not active_districts.exists():
-                        reply_text = "Maaf, belum ada data ongkir yang tersedia."
-                    else:
-                        lines = ["Berikut daftar ongkir Kaloriz:"]
-                        for dist in active_districts:
-                            lines.append(
-                                f"- {dist.name}: {format_currency(dist.reg_cost)} (Reg) / "
-                                f"{format_currency(dist.exp_cost)} (Express)"
+                    return JsonResponse(
+                        {
+                            "reply": (
+                                "Maaf, nomor pesanan tersebut belum ditemukan. "
+                                "Pastikan formatnya benar atau ketik 'lacak pesanan' untuk melihat daftar terbaru."
                             )
-                        reply_text = "\n".join(lines)
+                        }
+                    )
 
-        elif intent == "CANCEL_ORDER_INFO":
-            reply_text = (
-                "Pesanan yang sudah dibayar bisa dibatalkan jika statusnya belum dikemas. "
-                "Silakan hubungi admin Kaloriz atau gunakan fitur pembatalan di halaman pesanan jika tersedia."
-            )
+                request.session["chatbot_state"] = "awaiting_order_selection"
+                request.session["chatbot_last_orders"] = [order.id for order in last_orders]
 
-        elif intent in {"PAYMENT_INFO", "SHIPPING_INFO", "OPERATIONAL_HOURS", "CONTACT_ADMIN"}:
-            context_hint = (
-                "Jawab secara singkat dalam Bahasa Indonesia. "
-                "Jika ada informasi harga atau kebijakan, sampaikan secara umum tanpa detail sensitif."
-            )
-            reply_text = ask_ai_with_priority(
-                f"{context_hint}\n\n{ai_product_safety}\n\nPertanyaan: {message}"
-            )
+                lines = ["Berikut 3 pesanan terakhir kamu:"]
+                for idx, order in enumerate(last_orders, start=1):
+                    created_at = getattr(order, "created_at", None)
+                    tanggal_str = created_at.strftime("%d %b %Y") if created_at else "-"
+                    status_display = get_order_status_label(order)
+                    nomor_pesanan = get_order_identifier(order)
+                    lines.append(
+                        f"{idx}. {nomor_pesanan} – {tanggal_str} – {status_display}"
+                    )
 
-        else:
-            reply_text = ask_ai_with_priority(
-                f"{ai_product_safety}\n\nPertanyaan: {message}"
-            )
+                lines.append("")
+                lines.append(
+                    "Silakan ketik angka 1 / 2 / 3 atau masukkan nomor pesanan kamu ya."
+                )
 
-        return JsonResponse({"reply": reply_text})
+                return JsonResponse({"reply": "\n".join(lines)})
+
+            except Exception as e:
+                logger.error(f"Chatbot error: {e}")
+                return JsonResponse({"reply": "Maaf, sistem sedang bermasalah."})
+
+        return JsonResponse({'reply': handle_general_intents(True)})
+
 
     except Exception as exc:  # Fallback aman saat ada error server
-        logger.exception("Error in chatbot_view: %s", exc)
-        return JsonResponse(
-            {"reply": "Maaf, terjadi kesalahan sistem. Silakan coba lagi."}
-        )
+        logger.error(f"Chatbot error: {exc}")
+        return JsonResponse({"reply": "Maaf, terjadi kesalahan."})
