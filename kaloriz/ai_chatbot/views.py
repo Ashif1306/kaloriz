@@ -271,6 +271,7 @@ def chatbot_view(request):
             return JsonResponse({"reply": "Silakan tulis pertanyaanmu dulu ya 😊"})
 
         normalized_message = message.lower()
+        user_authenticated = request.user.is_authenticated
         ai_product_safety = (
             "Jangan pernah mengarang daftar produk. Jika user meminta produk tapi intent produk gagal diproses, jawab:\n"
             "'Silakan cek halaman Produk di website Kaloriz untuk daftar terbaru'.\n"
@@ -324,7 +325,7 @@ def chatbot_view(request):
             "riwayat pesanan",
         )
         if any(phrase in normalized_message for phrase in order_history_phrases):
-            if request.user.is_anonymous:
+            if not user_authenticated:
                 return JsonResponse(
                     {
                         "reply": (
@@ -392,7 +393,7 @@ def chatbot_view(request):
             request.session.pop("chatbot_last_orders", None)
 
         if is_track_order_intent:
-            if request.user.is_anonymous:
+            if not user_authenticated:
                 reset_order_session()
                 return JsonResponse(
                     {
@@ -555,7 +556,7 @@ def chatbot_view(request):
             )
 
         elif intent == "TRACK_ORDER":
-            if request.user.is_anonymous:
+            if not user_authenticated:
                 reply_text = "Untuk melacak pesanan, silakan login terlebih dahulu ya 🙂"
             else:
                 orders = (
@@ -662,5 +663,5 @@ def chatbot_view(request):
     except Exception as exc:  # Fallback aman saat ada error server
         logger.exception("Error in chatbot_view: %s", exc)
         return JsonResponse(
-            {"reply": "Maaf, sedang ada kendala di server chatbot. Coba lagi beberapa saat ya."}
+            {"reply": "Maaf, terjadi kesalahan sistem. Silakan coba lagi."}
         )
